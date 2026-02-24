@@ -1,0 +1,5 @@
+.markdown-body table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+.markdown-body thead { background: rgba(255,255,255,0.05); }
+.markdown-body th { padding: 6px 10px; border-bottom: 1px solid #3a3a50; color: #a0a0b0; font-weight: 600; font-size: 12px; }
+.markdown-body td { padding: 6px 10px; border-bottom: 1px solid #2a2a3a; color: #c0c0d0; }
+.markdown-body tr:hover { background: rgba(255,255,255,0.02); }
