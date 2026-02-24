@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wreporter — Executive Profiler</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+KR:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════
+   DESIGN TOKENS — Deepgram-inspired
+   ═══════════════════════════════════════ */
+:root {
+  --bg-0: #0a0a0f; --bg-1: #111118; --bg-2: #17171f; --bg-3: #1e1e28;
+  --bg-hover: #252530; --bg-glass: rgba(17,17,24,0.92);
+  --tx-0: #e8e8f0; --tx-1: #9b9baf; --tx-2: #6a6a80; --tx-3: #44445a;
+  --accent: #13deb9; --accent-2: #5eead4; --accent-dim: rgba(19,222,185,0.12);
+  --accent-line: rgba(19,222,185,0.3);
+  --green: #34d399; --green-bg: rgba(52,211,153,0.10);
+  --amber: #fbbf24; --amber-bg: rgba(251,191,36,0.08);
+  --red: #f87171; --red-bg: rgba(248,113,113,0.08);
+  --blue: #60a5fa; --blue-bg: rgba(96,165,250,0.08);
+  --violet: #a78bfa; --violet-bg: rgba(167,139,250,0.08);
+  --border: rgba(255,255,255,0.06); --border-2: rgba(255,255,255,0.10);
+  --radius: 10px; --radius-sm: 6px;
+}
+
+/* ═══════════════════════════════════════
+   RESET & BASE
+   ═══════════════════════════════════════ */
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'IBM Plex Sans KR',-apple-system,sans-serif;background:var(--bg-0);color:var(--tx-0);height:100vh;overflow:hidden;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-thumb{background:var(--tx-3);border-radius:2px}
+::-webkit-scrollbar-track{background:transparent}
+button{font-family:inherit}
+
+/* ═══════════════════════════════════════
+   LAYOUT — Single column + drawer
+   ═══════════════════════════════════════ */
+.app{display:flex;flex-direction:column;height:100vh;position:relative;overflow:hidden}
+
+/* Header — compact */
+.hdr{display:flex;align-items:center;padding:0 12px;height:38px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg-1);z-index:10}
+.hdr-logo{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;letter-spacing:-0.02em;color:var(--accent)}
+.hdr-logo svg{width:16px;height:16px}
+.hdr-r{margin-left:auto;display:flex;align-items:center;gap:4px}
+.hdr-btn{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--tx-2);cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;transition:.15s}
+.hdr-btn:hover{background:var(--bg-hover);color:var(--tx-1)}
+.chip{font-size:8px;font-family:'JetBrains Mono',monospace;padding:2px 8px;border-radius:12px;display:flex;align-items:center;gap:4px;border:1px solid var(--border)}
+.chip-live{color:var(--accent);border-color:var(--accent-line)}
+.chip-demo{color:var(--tx-2)}
+.pulse-d{width:4px;height:4px;border-radius:50%;background:currentColor}
+.pulse-d.on{animation:pls 2s infinite}
+@keyframes pls{50%{opacity:.25}}
+
+/* Main area */
+.main{flex:1;display:flex;overflow:hidden;position:relative}
+
+/* Primary panel — investigation + exec list */
+.pnl-main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.pnl-hd{padding:6px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;flex-shrink:0;height:32px;background:var(--bg-1)}
+.pnl-tt{font-size:9px;font-weight:600;color:var(--tx-2);text-transform:uppercase;letter-spacing:.04em}
+.pnl-badge{margin-left:auto;font-size:8px;font-family:'JetBrains Mono',monospace;color:var(--tx-3)}
+.pnl-body{flex:1;overflow-y:auto;padding:12px;scroll-behavior:smooth}
+
+/* ═══════════════════════════════════════
+   STATS BAR — Compact horizontal
+   ═══════════════════════════════════════ */
+.stats-bar{display:flex;gap:2px;padding:6px 12px;background:var(--bg-1);border-bottom:1px solid var(--border);flex-shrink:0}
+.stat-pill{flex:1;display:flex;align-items:center;justify-content:center;gap:4px;padding:4px 0;border-radius:var(--radius-sm);background:var(--bg-2)}
+.stat-pill-n{font-size:13px;font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--accent)}
+.stat-pill-l{font-size:7px;color:var(--tx-3);text-transform:uppercase;letter-spacing:.04em}
+
+/* ═══════════════════════════════════════
+   DRAWER — slide from right
+   ═══════════════════════════════════════ */
+.drawer-overlay{position:absolute;inset:0;background:rgba(0,0,0,0.4);z-index:20;opacity:0;pointer-events:none;transition:opacity .25s}
+.drawer-overlay.open{opacity:1;pointer-events:auto}
+.drawer{position:absolute;top:0;right:0;bottom:0;width:min(420px,85%);background:var(--bg-1);z-index:21;transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;border-left:1px solid var(--border);box-shadow:-8px 0 30px rgba(0,0,0,0.3)}
+.drawer.open{transform:translateX(0)}
+.drawer-hd{display:flex;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);flex-shrink:0;gap:8px}
+.drawer-close{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--tx-2);cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center}
+.drawer-close:hover{background:var(--bg-hover);color:var(--tx-0)}
+.drawer-tabs{display:flex;gap:2px;flex:1}
+.drawer-tab{padding:5px 10px;border-radius:var(--radius-sm);font-size:9px;font-weight:500;color:var(--tx-2);cursor:pointer;border:none;background:transparent;transition:.15s;text-transform:uppercase;letter-spacing:.03em}
+.drawer-tab:hover{color:var(--tx-1);background:var(--bg-hover)}
+.drawer-tab.active{color:var(--accent);background:var(--accent-dim)}
+.drawer-body{flex:1;overflow-y:auto;padding:12px}
+.drawer-panel{display:none}
+.drawer-panel.active{display:block}
+
+/* (FAB removed — drawer opens by clicking exec cards) */
+
+/* ═══════════════════════════════════════
+   WELCOME / SEARCH
+   ═══════════════════════════════════════ */
+.welc{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;text-align:center;padding:20px}
+.welc-ic{font-size:24px;opacity:.15}
+.welc-tx{font-size:11px;color:var(--tx-3);line-height:1.7;max-width:280px}
+
+.srch-wrap{position:relative;width:100%;max-width:360px;margin:0 auto}
+.srch-inp{width:100%;padding:10px 14px 10px 34px;border:1px solid var(--border-2);border-radius:var(--radius);background:var(--bg-2);color:var(--tx-0);font-size:13px;font-family:inherit;outline:none;transition:.2s}
+.srch-inp:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+.srch-inp::placeholder{color:var(--tx-3)}
+.srch-ic{position:absolute;left:11px;top:11px;font-size:12px;color:var(--tx-3);pointer-events:none}
+.srch-spin{position:absolute;right:12px;top:12px;width:14px;height:14px;border:2px solid var(--accent-dim);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;display:none}
+.srch-toggles{display:flex;gap:12px;margin-top:6px;justify-content:center}
+.srch-tog{display:flex;align-items:center;gap:4px;font-size:9px;color:var(--tx-2);cursor:pointer;user-select:none}
+.srch-tog input{display:none}
+.tog-track{width:24px;height:12px;border-radius:6px;background:var(--bg-3);position:relative;transition:.2s;border:1px solid var(--border)}
+.tog-track::after{content:'';position:absolute;left:1px;top:1px;width:8px;height:8px;border-radius:50%;background:var(--tx-3);transition:.2s}
+.srch-tog input:checked+.tog-track{background:var(--accent-dim);border-color:var(--accent)}
+.srch-tog input:checked+.tog-track::after{left:13px;background:var(--accent)}
+.srch-results{position:absolute;top:calc(100% + 4px);left:0;right:0;max-height:300px;overflow-y:auto;background:var(--bg-1);border:1px solid var(--border-2);border-radius:var(--radius);box-shadow:0 8px 24px rgba(0,0,0,0.4);z-index:100;display:none}
+.srch-results.open{display:block}
+.srch-item{padding:8px 12px;cursor:pointer;transition:.12s;border-bottom:1px solid var(--border)}
+.srch-item:last-child{border-bottom:none}
+.srch-item:hover{background:var(--bg-hover)}
+.si-r1{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+.si-name{font-size:12px;font-weight:600;color:var(--tx-0)}
+.si-eng{font-size:10px;color:var(--tx-2)}
+.si-r2,.si-r3{display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-top:2px}
+.si-prop{font-size:9px;color:var(--tx-2);white-space:nowrap}
+.si-prop-lb{color:var(--tx-3);margin-right:2px}
+.si-tag{font-size:8px;padding:1px 5px;border-radius:3px;font-family:'JetBrains Mono',monospace;white-space:nowrap}
+.si-tag-kospi{background:rgba(96,165,250,0.12);color:#60a5fa}
+.si-tag-kosdaq{background:rgba(52,211,153,0.12);color:#34d399}
+.si-tag-konex{background:rgba(251,191,36,0.10);color:#fbbf24}
+.si-tag-외감{background:rgba(168,85,247,0.10);color:#a855f7}
+.si-tag-비외감{background:rgba(107,114,128,0.10);color:#9ca3af}
+.si-tag-dart{background:rgba(52,211,153,0.10);color:#34d399}
+.si-tag-fsc{background:rgba(96,165,250,0.10);color:#60a5fa}
+.si-tag-both{background:rgba(139,92,246,0.10);color:#8b5cf6}
+.srch-empty{padding:14px;text-align:center;font-size:10px;color:var(--tx-3)}
+
+/* Company card */
+.co-card{margin-top:14px;padding:12px 16px;border-radius:var(--radius);background:var(--bg-2);border:1px solid var(--border-2);text-align:left;max-width:360px;margin-left:auto;margin-right:auto}
+.co-card .si-name{font-size:14px}
+
+/* ═══════════════════════════════════════
+   INVESTIGATION — Timeline
+   ═══════════════════════════════════════ */
+/* Phase */
+.ph{margin-bottom:16px;animation:fadeUp .25s ease-out}
+@keyframes fadeUp{from{opacity:0;transform:translateY(4px)}}
+.ph-hd{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.ph-ic{font-size:10px}
+.ph-lb{font-size:9px;font-weight:600;color:var(--accent);letter-spacing:.03em}
+.ph-tm{margin-left:auto;font-size:8px;font-family:'JetBrains Mono',monospace;color:var(--tx-3)}
+
+/* Steps — vertical timeline */
+.steps{position:relative;padding-left:14px}
+.steps::before{content:'';position:absolute;left:3.5px;top:4px;bottom:4px;width:1px;background:var(--border-2)}
+.stp{display:flex;align-items:flex-start;gap:7px;padding:3px 0;position:relative;animation:stepIn .18s ease-out}
+@keyframes stepIn{from{opacity:0;transform:translateX(-2px)}}
+.stp-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:3px;margin-left:-14px;position:relative;z-index:1;background:var(--bg-1)}
+.stp-dot.running{border:2px solid var(--accent);border-top-color:transparent;animation:spin .55s linear infinite;background:transparent}
+.stp-dot.done{background:var(--accent);box-shadow:0 0 6px var(--accent-dim)}
+.stp-dot.error{background:var(--red)}
+.stp-dot.hypo{background:var(--amber)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.stp-body{flex:1;min-width:0}
+.stp-tx{font-size:10px;color:var(--tx-1);line-height:1.5}
+.stp-tx .hl{color:var(--accent-2);font-family:'JetBrains Mono',monospace;font-size:9px}
+.stp-tx .found{color:var(--green);font-weight:500}
+.stp-tx .warn{color:var(--amber)}
+.stp-sub{font-size:8px;color:var(--tx-3);margin-top:1px;font-family:'JetBrains Mono',monospace}
+
+/* Hypothesis card */
+.hypo-card{margin:6px 0;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid rgba(251,191,36,0.15);background:var(--amber-bg);animation:fadeUp .3s}
+.hypo-hd{display:flex;align-items:center;gap:5px;margin-bottom:3px}
+.hypo-id{font-size:7px;font-family:'JetBrains Mono',monospace;padding:1px 5px;border-radius:3px;font-weight:600}
+.hypo-id-active{background:var(--amber-bg);color:var(--amber);border:1px solid rgba(251,191,36,0.2)}
+.hypo-id-confirmed{background:var(--green-bg);color:var(--green);border:1px solid rgba(52,211,153,0.2)}
+.hypo-id-refuted{background:var(--red-bg);color:var(--red);border:1px solid rgba(248,113,113,0.2);text-decoration:line-through}
+.hypo-id-inconclusive{background:rgba(107,114,128,0.1);color:var(--tx-2);border:1px solid var(--border)}
+.hypo-status{font-size:7px;color:var(--tx-2);text-transform:uppercase;letter-spacing:.04em;margin-left:auto}
+.hypo-tx{font-size:10px;color:var(--tx-0);line-height:1.5}
+
+/* Discovery */
+.disc-box{margin:6px 0;padding:8px 10px;border-radius:var(--radius-sm);background:var(--green-bg);border:1px solid rgba(52,211,153,0.15);animation:fadeUp .3s}
+.disc-lb{font-size:7px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px;display:flex;align-items:center;gap:4px}
+.disc-tx{font-size:10px;color:var(--tx-0);line-height:1.5}
+
+/* Budget gauge */
+.budget-bar{margin:8px 0;padding:8px 10px;border-radius:var(--radius-sm);background:var(--bg-2);border:1px solid var(--border);display:flex;gap:12px;align-items:center;font-size:9px;font-family:'JetBrains Mono',monospace;color:var(--tx-2);animation:fadeUp .2s}
+.budget-gauge{flex:1;height:3px;background:var(--bg-3);border-radius:2px;overflow:hidden}
+.budget-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--green));border-radius:2px;transition:width .4s ease}
+
+/* Progress */
+.prog{margin:10px 0;padding:8px 10px;border-radius:var(--radius-sm);background:var(--bg-2);border:1px solid var(--border)}
+.prog-top{display:flex;justify-content:space-between;font-size:8px;color:var(--tx-2);margin-bottom:4px}
+.prog-bar{height:2px;background:var(--bg-3);border-radius:1px;overflow:hidden}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--green));border-radius:1px;transition:width .6s ease}
+.prog-fill.indeterminate{width:30%!important;animation:progSlide 1.5s ease-in-out infinite}
+@keyframes progSlide{0%{transform:translateX(-100%)}50%{transform:translateX(200%)}100%{transform:translateX(-100%)}}
+
+/* ═══════════════════════════════════════
+   EXEC LIST — Collect phase
+   ═══════════════════════════════════════ */
+.exec-list-hd{padding:10px 0;border-bottom:1px solid var(--border);margin-bottom:8px}
+.exec-list-hd-tt{font-size:13px;font-weight:600}
+.exec-list-hd-sub{font-size:10px;color:var(--tx-1);margin-top:2px}
+.exec-card{padding:8px 10px;border-radius:var(--radius-sm);background:var(--bg-2);border:1px solid var(--border);transition:.15s;margin-bottom:4px;position:relative;overflow:hidden}
+.exec-card:hover{background:var(--bg-hover);border-color:var(--border-2)}
+/* Profiling mode — clickable cards */
+.exec-card.profiling{cursor:pointer;border-color:var(--border-2)}
+.exec-card.profiling:hover{border-color:var(--accent-line)}
+.exec-card.profiling.active-exec{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent-dim)}
+.exec-card.profiling.investigated{border-color:var(--green-line,rgba(52,211,153,0.3))}
+.exec-card.profiling.selected-exec{border-color:var(--accent);background:var(--accent-dim)}
+/* Progress bar inside card */
+.ec-prog{position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--bg-3)}
+.ec-prog-fill{height:100%;background:var(--accent);border-radius:0 1px 1px 0;transition:width .4s ease;width:0}
+.ec-prog-fill.done{background:var(--green)}
+/* Status row */
+.ec-status{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:9px;font-family:'JetBrains Mono',monospace}
+.ec-badge{padding:1px 5px;border-radius:3px;display:inline-flex;align-items:center;gap:3px}
+.ec-badge-fp{background:var(--accent-dim);color:var(--accent)}
+.ec-badge-rp{background:var(--amber-bg);color:var(--amber)}
+.ec-badge-wait{background:var(--bg-3);color:var(--tx-3)}
+.ec-badge-run{background:var(--accent-dim);color:var(--accent)}
+.ec-badge-done{background:var(--green-bg);color:var(--green)}
+.ec-badge-hy{background:var(--amber-bg);color:var(--amber)}
+.ec-spinner{width:8px;height:8px;border:1.5px solid var(--accent-dim);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;display:inline-block}
+
+/* Hypothesis cards in drawer */
+.hypo-drawer-card{padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);margin-bottom:6px;animation:fpPop .3s}
+.hypo-drawer-active{background:var(--amber-bg);border-color:rgba(251,191,36,0.15)}
+.hypo-drawer-confirmed{background:var(--green-bg);border-color:rgba(52,211,153,0.15)}
+.hypo-drawer-refuted{background:var(--red-bg);border-color:rgba(248,113,113,0.15);opacity:.6}
+.hypo-drawer-inconclusive{background:var(--bg-2);border-color:var(--border)}
+.hypo-drawer-hd{display:flex;align-items:center;gap:5px;margin-bottom:3px}
+.hypo-drawer-status{font-size:8px;font-family:'JetBrains Mono',monospace}
+.hypo-st-active{color:var(--amber)}
+.hypo-st-confirmed{color:var(--green)}
+.hypo-st-refuted{color:var(--red);text-decoration:line-through}
+.hypo-st-inconclusive{color:var(--tx-2)}
+.hypo-drawer-tx{font-size:10px;color:var(--tx-0);line-height:1.5}
+.exec-actions{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-top:1px solid var(--border);margin-top:8px}
+.btn-primary{padding:7px 16px;font-size:11px;font-weight:600;border-radius:var(--radius-sm);border:none;background:var(--accent);color:var(--bg-0);cursor:pointer;font-family:inherit;transition:.15s}
+.btn-primary:hover{opacity:.85}
+.btn-secondary{padding:6px 12px;font-size:10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:transparent;color:var(--tx-1);cursor:pointer;font-family:inherit;transition:.15s}
+.btn-secondary:hover{background:var(--bg-hover)}
+
+/* ═══════════════════════════════════════
+   DRAWER — Footprint Cards
+   ═══════════════════════════════════════ */
+.fp-card{margin-bottom:8px;border-radius:var(--radius-sm);border:1px solid var(--border);overflow:hidden;animation:fpPop .35s cubic-bezier(.4,0,.2,1);background:var(--bg-2)}
+@keyframes fpPop{from{opacity:0;transform:scale(.95) translateY(8px)}}
+.fp-card-hd{padding:8px 10px;display:flex;align-items:flex-start;gap:8px;cursor:pointer}
+.fp-card-hd:hover{background:var(--bg-hover)}
+.fp-conf{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:5px}
+.fp-conf-confirmed{background:var(--green);box-shadow:0 0 6px var(--green-bg)}
+.fp-conf-high{background:var(--accent);box-shadow:0 0 6px var(--accent-dim)}
+.fp-conf-probable{background:var(--amber)}
+.fp-conf-speculative{background:var(--red)}
+.fp-conf-unverified{background:var(--tx-3)}
+.fp-info{flex:1;min-width:0}
+.fp-title{font-size:10px;font-weight:500;color:var(--tx-0);line-height:1.4}
+.fp-id-badge{display:inline;font-size:7px;font-family:'JetBrains Mono',monospace;color:var(--accent);background:var(--accent-dim);padding:1px 4px;border-radius:3px;margin-right:4px;vertical-align:middle}
+.fp-meta{display:flex;gap:4px;margin-top:2px;flex-wrap:wrap}
+.fp-tag{font-size:7px;padding:1px 5px;border-radius:3px;font-family:'JetBrains Mono',monospace}
+.fp-tag-topic{background:var(--accent-dim);color:var(--accent)}
+.fp-tag-activity{background:var(--violet-bg);color:var(--violet)}
+.fp-tag-fresh{background:var(--green-bg);color:var(--green)}
+.fp-tag-old{background:rgba(107,114,128,0.1);color:var(--tx-2)}
+.fp-platform{font-size:7px;color:var(--tx-3);font-family:'JetBrains Mono',monospace}
+.fp-detail{display:none;padding:0 10px 8px;font-size:10px;color:var(--tx-1);line-height:1.6;border-top:1px solid var(--border);margin:0 6px}
+.fp-detail.open{display:block;padding-top:6px;margin-top:4px}
+.fp-excerpt{font-style:italic;color:var(--tx-0);padding:4px 8px;border-left:2px solid var(--accent);margin:4px 0;font-family:'Noto Serif KR',serif;font-size:10px}
+.fp-link{font-size:8px;color:var(--accent);text-decoration:none;font-family:'JetBrains Mono',monospace;word-break:break-all}
+.fp-link:hover{text-decoration:underline}
+
+/* ═══════════════════════════════════════
+   DRAWER — Rapport Keywords
+   ═══════════════════════════════════════ */
+.rapport-card{padding:8px 10px;border-radius:var(--radius-sm);background:var(--bg-2);border:1px solid var(--border);margin-bottom:6px;animation:fpPop .3s}
+.rapport-kw{font-size:12px;font-weight:600;display:flex;align-items:center;gap:5px}
+.rapport-conf{font-size:7px;font-family:'JetBrains Mono',monospace;padding:1px 5px;border-radius:3px}
+.rapport-conf-confirmed{background:var(--green-bg);color:var(--green)}
+.rapport-conf-high{background:var(--accent-dim);color:var(--accent)}
+.rapport-note{font-size:10px;color:var(--tx-1);margin-top:3px;line-height:1.5}
+.rapport-basis{font-size:8px;color:var(--tx-3);margin-top:2px}
+
+/* ═══════════════════════════════════════
+   DRAWER — Briefing
+   ═══════════════════════════════════════ */
+.briefing-box{padding:12px;border-radius:var(--radius);background:var(--bg-2);border:1px solid var(--accent-line);animation:fadeUp .3s}
+.briefing-box h2{font-size:13px;font-weight:600;color:var(--accent);margin:12px 0 6px}
+.briefing-box h3{font-size:11px;font-weight:600;color:var(--tx-0);margin:10px 0 4px}
+.briefing-box p,.briefing-box li{font-size:10px;color:var(--tx-1);line-height:1.7}
+.briefing-box ol,.briefing-box ul{padding-left:16px}
+/* Footnote badges [FP-N] */
+.fn-badge{display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-family:'JetBrains Mono',monospace;color:var(--accent);background:var(--accent-dim);padding:0 3px;border-radius:3px;cursor:pointer;vertical-align:super;line-height:1;margin:0 1px;transition:.15s;text-decoration:none}
+.fn-badge:hover{background:var(--accent);color:var(--bg-0)}
+
+/* ═══════════════════════════════════════
+   DRAWER — References
+   ═══════════════════════════════════════ */
+.ref-it{display:flex;align-items:flex-start;gap:6px;padding:5px 0;border-bottom:1px solid var(--border);animation:fadeUp .15s}
+.ref-it:last-child{border-bottom:none}
+.ref-n{font-size:7px;font-family:'JetBrains Mono',monospace;color:var(--accent);background:var(--accent-dim);padding:1px 4px;border-radius:3px;flex-shrink:0;margin-top:2px}
+.ref-body{flex:1;min-width:0}
+.ref-tt{font-size:9px;color:var(--tx-0);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ref-url{font-size:7px;font-family:'JetBrains Mono',monospace;color:var(--tx-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ref-tp{font-size:6px;padding:1px 4px;border-radius:3px;flex-shrink:0;margin-top:2px;font-family:'JetBrains Mono',monospace;text-transform:uppercase}
+.ref-tp.web{background:var(--blue-bg);color:var(--blue)}
+.ref-tp.sns{background:var(--amber-bg);color:var(--amber)}
+.ref-tp.news{background:var(--green-bg);color:var(--green)}
+.ref-tp.db{background:var(--accent-dim);color:var(--accent)}
+
+/* ═══════════════════════════════════════
+   CONFIG MODAL
+   ═══════════════════════════════════════ */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:50;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.modal-bg.open{display:flex}
+.modal{background:var(--bg-1);border:1px solid var(--border-2);border-radius:var(--radius);padding:20px;width:380px;max-width:90vw}
+.modal-tt{font-size:13px;font-weight:600;margin-bottom:14px}
+.modal-fld{margin-bottom:12px}
+.modal-lb{font-size:8px;color:var(--tx-2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+.modal-inp{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-2);color:var(--tx-0);font-family:'JetBrains Mono',monospace;font-size:10px;outline:none}
+.modal-inp:focus{border-color:var(--accent)}
+.modal-acts{display:flex;gap:6px;justify-content:flex-end}
+
+/* ═══════════════════════════════════════
+   EMPTY STATES
+   ═══════════════════════════════════════ */
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px 20px;text-align:center;gap:6px}
+.empty-ic{font-size:20px;opacity:.15}
+.empty-tx{font-size:10px;color:var(--tx-3);line-height:1.6}
+
+/* ═══════════════════════════════════════
+   SECTION DIVIDERS in drawer
+   ═══════════════════════════════════════ */
+.sec-lb{font-size:8px;font-weight:600;color:var(--tx-3);text-transform:uppercase;letter-spacing:.05em;margin:12px 0 6px;padding-bottom:4px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:5px}
+.sec-lb:first-child{margin-top:0}
+
+/* Per-executive section in drawer */
+.exec-section{margin-bottom:16px}
+.exec-section-hd{display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:6px 0;border-bottom:1px solid var(--border);cursor:pointer}
+.exec-section-hd:hover .exec-section-name{color:var(--accent)}
+.exec-av{width:28px;height:28px;border-radius:7px;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;font-family:'Noto Serif KR',serif;font-size:13px;font-weight:700;color:var(--accent);flex-shrink:0}
+.exec-section-name{font-size:12px;font-weight:600;transition:.15s}
+.exec-section-role{font-size:9px;color:var(--tx-2)}
+.exec-section-count{margin-left:auto;font-size:8px;font-family:'JetBrains Mono',monospace;color:var(--tx-3)}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- ═══ Header ═══ -->
+  <div class="hdr">
+    <div class="hdr-logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>
+      Wreporter
+    </div>
+    <div class="hdr-r">
+      <div class="chip chip-demo" id="stChip"><span class="pulse-d" id="stDot"></span><span id="stLbl">Demo</span></div>
+      <button class="hdr-btn" onclick="resetToHome()" title="처음으로">⌂</button>
+      <button class="hdr-btn" onclick="togCfg()" title="Settings">⚙</button>
+    </div>
+  </div>
+
+  <!-- ═══ Stats Bar ═══ -->
+  <div class="stats-bar" id="statsBar" style="display:none">
+    <div class="stat-pill"><span class="stat-pill-n" id="sN1">0</span><span class="stat-pill-l">Searches</span></div>
+    <div class="stat-pill"><span class="stat-pill-n" id="sN2">0</span><span class="stat-pill-l">Fetches</span></div>
+    <div class="stat-pill"><span class="stat-pill-n" id="sN3">0</span><span class="stat-pill-l">Hypotheses</span></div>
+    <div class="stat-pill"><span class="stat-pill-n" id="sN4">0</span><span class="stat-pill-l">Footprints</span></div>
+    <div class="stat-pill"><span class="stat-pill-n" id="tmBadge">0:00</span><span class="stat-pill-l">Time</span></div>
+  </div>
+
+  <!-- ═══ Main Panel ═══ -->
+  <div class="main">
+    <div class="pnl-main">
+      <div class="pnl-hd">
+        <span style="color:var(--accent);font-size:10px">🔍</span>
+        <span class="pnl-tt">Investigation</span>
+        <span class="pnl-badge" id="phaseBadge"></span>
+      </div>
+      <div class="pnl-body" id="mainBody">
+        <div class="welc" id="mainWelc">
+          <div class="welc-ic">🔍</div>
+          <div class="welc-tx">분석할 기업을 검색하세요.<br>AI가 임원의 디지털 발자취를 추적합니다.</div>
+          <div class="srch-wrap" id="srchWrap">
+            <span class="srch-ic">🔍</span>
+            <input class="srch-inp" id="srchInp" placeholder="기업명을 입력하세요..." oninput="onSearch(this.value)" autocomplete="off">
+            <div class="srch-spin" id="srchSpin"></div>
+            <div class="srch-toggles">
+              <label class="srch-tog"><input type="checkbox" id="togEng" onchange="reSearch()"><span class="tog-track"></span>영문</label>
+              <label class="srch-tog"><input type="checkbox" id="togFuzzy" onchange="reSearch()"><span class="tog-track"></span>유사</label>
+            </div>
+            <div class="srch-results" id="srchResults"></div>
+          </div>
+          <div id="coCardSlot"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Drawer overlay -->
+    <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+
+    <!-- Drawer -->
+    <div class="drawer" id="drawer">
+      <div class="drawer-hd">
+        <button class="drawer-close" onclick="closeDrawer()">✕</button>
+        <div class="drawer-tabs">
+          <button class="drawer-tab active" data-tab="footprints" onclick="switchTab(this)">발자국</button>
+          <button class="drawer-tab" data-tab="rapport" onclick="switchTab(this)">래포</button>
+          <button class="drawer-tab" data-tab="briefing" onclick="switchTab(this)">브리핑</button>
+          <button class="drawer-tab" data-tab="hypos" onclick="switchTab(this)">가설</button>
+        </div>
+      </div>
+      <div class="drawer-body">
+        <div class="drawer-panel active" id="tab-footprints">
+          <div class="empty-state" id="fpEmpty"><div class="empty-ic">👣</div><div class="empty-tx">발견된 발자국이 여기에 쌓입니다</div></div>
+          <div id="fpList" style="display:none"></div>
+        </div>
+        <div class="drawer-panel" id="tab-rapport">
+          <div class="empty-state" id="rapportEmpty"><div class="empty-ic">🤝</div><div class="empty-tx">래포 키워드가 여기에 쌓입니다</div></div>
+          <div id="rapportList" style="display:none"></div>
+        </div>
+        <div class="drawer-panel" id="tab-briefing">
+          <div class="empty-state" id="briefingEmpty"><div class="empty-ic">📊</div><div class="empty-tx">조사 완료 후 브리핑이 생성됩니다</div></div>
+          <div id="briefingList" style="display:none"></div>
+        </div>
+        <div class="drawer-panel" id="tab-hypos">
+          <div class="empty-state" id="hyposEmpty"><div class="empty-ic">💡</div><div class="empty-tx">가설이 여기에 실시간으로 쌓입니다</div></div>
+          <div id="hyposList" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Config Modal -->
+<div class="modal-bg" id="cfgModal">
+  <div class="modal">
+    <div class="modal-tt">⚙ Connection</div>
+    <div class="modal-fld">
+      <div class="modal-lb">n8n Webhook URL</div>
+      <input class="modal-inp" id="cfgUrl" value="https://wrtn-alec.app.n8n.cloud/webhook/executives-v031/collect" placeholder="https://...">
+    </div>
+    <div class="modal-fld">
+      <div class="modal-lb">Company Search API</div>
+      <input class="modal-inp" id="cfgSearchUrl" value="https://typdsbbmmujlhcfdurdj.supabase.co/functions/v1/swift-task" placeholder="https://...">
+    </div>
+    <div class="modal-acts">
+      <button class="btn-secondary" onclick="togCfg()">취소</button>
+      <button class="btn-primary" onclick="saveCfg()">저장</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════
+   STATE
+   ═══════════════════════════════════════════════ */
+let whUrl='',searchUrl='',demo=true,busy=false,sid='s_'+Date.now();
+setTimeout(()=>{whUrl=document.getElementById('cfgUrl')?.value||'';searchUrl=document.getElementById('cfgSearchUrl')?.value||'';demo=!whUrl;updateStatusChip();},0);
+let tmr=null,t0=null;
+let S={searches:0,fetches:0,hypotheses:0,footprints:0,rapports:0};
+let refN=0;
+const _seen=new Set();
+const $main=document.getElementById('mainBody');
+// Drawer data stores
+let footprintsByExec={}; // {name: [{...}]}
+let rapportsByExec={};
+// FP deduplication — Agent resets FP-N numbering after each tool call. We fix it here.
+let fpGlobalId=0;
+let fpSeenUrls=new Set();
+let fpSeenKeys=new Set(); // normalized title keywords
+let hypoByExec={}; // {name: [{id, status, text}]}
+let briefings=[];
+let hypoMap={}; // {id: {status, text, el, execName}}
+let currentExecName=''; // Track which exec is being investigated
+
+/* ═══════════════════════════════════════════════
+   URL PARAMS
+   ═══════════════════════════════════════════════ */
+const urlP=new URLSearchParams(window.location.search);
+let companyData=urlP.get('company')?{
+  company:urlP.get('company'),corp_code:urlP.get('corp_code')||'',jurir_no:urlP.get('jurir_no')||'',
+  ceo:urlP.get('ceo')||'',eng_name:urlP.get('eng_name')||'',hm_url:urlP.get('hm_url')||'',
+  data_source:urlP.get('data_source')||'',deal_page:urlP.get('deal_page')||''
+}:null;
+const paramWh=urlP.get('webhook')||'';const paramSearch=urlP.get('search_url')||'';
+if(paramWh){whUrl=paramWh;demo=false;}
+if(paramSearch){searchUrl=paramSearch;}
+
+/* ═══════════════════════════════════════════════
+   DRAWER
+   ═══════════════════════════════════════════════ */
+function openDrawer(){document.getElementById('drawer').classList.add('open');document.getElementById('drawerOverlay').classList.add('open');}
+function closeDrawer(){document.getElementById('drawer').classList.remove('open');document.getElementById('drawerOverlay').classList.remove('open');document.querySelectorAll('.exec-card.selected-exec').forEach(c=>c.classList.remove('selected-exec'));selectedExecForDrawer=null;}
+function switchTab(btn){
+  document.querySelectorAll('.drawer-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.drawer-panel').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+}
+
+/* ═══════════════════════════════════════════════
+   SEARCH
+   ═══════════════════════════════════════════════ */
+let searchTimer=null;
+function onSearch(q){clearTimeout(searchTimer);const res=document.getElementById('srchResults'),spin=document.getElementById('srchSpin');if(!q||q.length<2){res.classList.remove('open');spin.style.display='none';return;}spin.style.display='block';searchTimer=setTimeout(()=>doSearch(q),300);}
+function reSearch(){const q=document.getElementById('srchInp')?.value?.trim();if(q&&q.length>=2)doSearch(q);}
+function marketTagClass(l){if(l==='코스피')return'si-tag-kospi';if(l==='코스닥')return'si-tag-kosdaq';if(l==='코넥스')return'si-tag-konex';if(l?.includes('외감)'))return'si-tag-외감';if(l?.includes('비외감)'))return'si-tag-비외감';return'';}
+function sourceTagClass(s){if(s==='dart')return'si-tag-dart';if(s==='fsc')return'si-tag-fsc';if(s==='both')return'si-tag-both';return'';}
+function renderCompanyItem(c){
+  const mC=marketTagClass(c.market_label),sC=sourceTagClass(c.data_source);
+  let hm='';if(c.hm_url){const h=c.hm_url.startsWith('http')?c.hm_url:'https://'+c.hm_url;hm=`<a href="${esc(h)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--accent-2);text-decoration:none">${esc(c.hm_url)}</a>`;}
+  return`<div class="si-r1"><span class="si-name">${esc(c.corp_name)}</span>${c.corp_eng_name?'<span class="si-eng">'+esc(c.corp_eng_name)+'</span>':''}</div>
+    <div class="si-r2">${c.ceo_nm?'<span class="si-prop"><span class="si-prop-lb">대표</span>'+esc(c.ceo_nm)+'</span>':''}<span class="si-tag ${mC}">${esc(c.market_label||'')}</span><span class="si-tag ${sC}">${esc(c.source_label||c.data_source||'')}</span></div>
+    <div class="si-r3">${c.industry||c.enp_main_biz_nm?'<span class="si-prop"><span class="si-prop-lb">업종</span>'+esc(c.industry||c.enp_main_biz_nm||'')+'</span>':''}${c.hm_url?'<span class="si-prop"><span class="si-prop-lb">홈</span>'+hm+'</span>':''}</div>`;
+}
+async function doSearch(q){
+  const res=document.getElementById('srchResults'),spin=document.getElementById('srchSpin');
+  if(!searchUrl){res.innerHTML='<div class="srch-empty">Settings에서 Search API URL을 설정하세요</div>';res.classList.add('open');spin.style.display='none';return;}
+  const eng=document.getElementById('togEng')?.checked?'1':'0',fuzzy=document.getElementById('togFuzzy')?.checked?'1':'0';
+  try{const r=await fetch(searchUrl+'?q='+encodeURIComponent(q)+'&eng='+eng+'&fuzzy='+fuzzy);const d=await r.json();
+    if(!d.results||!d.results.length){res.innerHTML='<div class="srch-empty">검색 결과 없음</div>';}
+    else{res.innerHTML=d.results.map(c=>`<div class="srch-item" onclick='pickCompany(${JSON.stringify(c).replace(/'/g,"&#39;")})'>${renderCompanyItem(c)}</div>`).join('');}
+    res.classList.add('open');
+  }catch(e){res.innerHTML='<div class="srch-empty">오류: '+esc(e.message)+'</div>';res.classList.add('open');}
+  spin.style.display='none';
+}
+function pickCompany(c){
+  companyData={company:c.corp_name,corp_code:c.corp_code||'',jurir_no:c.jurir_no||'',ceo:c.ceo_nm||'',eng_name:c.corp_eng_name||'',hm_url:c.hm_url||'',data_source:c.data_source||'',has_dart:c.has_dart||false};
+  document.getElementById('srchResults').classList.remove('open');
+  document.getElementById('srchInp').value=c.corp_name;
+  document.getElementById('coCardSlot').innerHTML=`<div class="co-card">${renderCompanyItem(c)}<div style="display:flex;gap:6px;margin-top:10px"><button class="btn-primary" style="flex:1" onclick="startCollect()">👤 임원 수집 시작</button><button class="btn-secondary" onclick="clearPick()">←</button></div></div>`;
+}
+function clearPick(){companyData=null;document.getElementById('coCardSlot').innerHTML='';document.getElementById('srchInp').value='';document.getElementById('srchInp').focus();}
+document.addEventListener('click',e=>{if(!e.target.closest('.srch-wrap')){document.getElementById('srchResults')?.classList.remove('open');}});
+
+/* ═══════════════════════════════════════════════
+   RESET
+   ═══════════════════════════════════════════════ */
+function resetToHome(){
+  if(busy&&!confirm('진행 중인 작업이 있습니다. 초기화할까요?'))return;
+  busy=false;phase='idle';collectedExecs=[];execListBuf=null;stopTm();
+  footprintsByExec={};rapportsByExec={};hypoByExec={};briefings=[];hypoMap={};currentExecName='';selectedExecForDrawer=null;
+  fpGlobalId=0;fpSeenUrls=new Set();fpSeenKeys=new Set();
+  $main.innerHTML=`<div class="welc" id="mainWelc"><div class="welc-ic">🔍</div><div class="welc-tx">분석할 기업을 검색하세요.<br>AI가 임원의 디지털 발자취를 추적합니다.</div><div class="srch-wrap" id="srchWrap"><span class="srch-ic">🔍</span><input class="srch-inp" id="srchInp" placeholder="기업명을 입력하세요..." oninput="onSearch(this.value)" autocomplete="off"><div class="srch-spin" id="srchSpin"></div><div class="srch-toggles"><label class="srch-tog"><input type="checkbox" id="togEng" onchange="reSearch()"><span class="tog-track"></span>영문</label><label class="srch-tog"><input type="checkbox" id="togFuzzy" onchange="reSearch()"><span class="tog-track"></span>유사</label></div><div class="srch-results" id="srchResults"></div></div><div id="coCardSlot"></div></div>`;
+  S={searches:0,fetches:0,hypotheses:0,footprints:0,rapports:0};refN=0;
+  ['sN1','sN2','sN3','sN4'].forEach(id=>document.getElementById(id).textContent='0');
+  document.getElementById('tmBadge').textContent='0:00';
+  document.getElementById('statsBar').style.display='none';
+  
+  // Reset drawer
+  document.getElementById('fpList').innerHTML='';document.getElementById('fpList').style.display='none';document.getElementById('fpEmpty').style.display='';
+  document.getElementById('rapportList').innerHTML='';document.getElementById('rapportList').style.display='none';document.getElementById('rapportEmpty').style.display='';
+  document.getElementById('briefingList').innerHTML='';document.getElementById('briefingList').style.display='none';document.getElementById('briefingEmpty').style.display='';
+  document.getElementById('hyposList').innerHTML='';document.getElementById('hyposList').style.display='none';document.getElementById('hyposEmpty').style.display='';
+  closeDrawer();
+}
+
+let phase='idle',collectedExecs=[],execListBuf=null;
+
+/* ═══════════════════════════════════════════════
+   CONFIG
+   ═══════════════════════════════════════════════ */
+function togCfg(){document.getElementById('cfgModal').classList.toggle('open');}
+function saveCfg(){whUrl=document.getElementById('cfgUrl').value.trim();searchUrl=document.getElementById('cfgSearchUrl').value.trim();demo=!whUrl;updateStatusChip();togCfg();}
+function updateStatusChip(){const c=document.getElementById('stChip'),d=document.getElementById('stDot'),l=document.getElementById('stLbl');if(!demo){c.className='chip chip-live';d.classList.add('on');l.textContent='Live';}else{c.className='chip chip-demo';d.classList.remove('on');l.textContent='Demo';}}
+
+/* Init from URL params */
+function initFromParams(){
+  if(paramWh){document.getElementById('cfgUrl').value=paramWh;updateStatusChip();}
+  if(paramSearch){document.getElementById('cfgSearchUrl').value=paramSearch;}
+  if(!companyData)return;
+  const welc=document.getElementById('mainWelc');
+  if(welc){welc.innerHTML=`<div class="welc-ic">🏢</div><div style="font-size:14px;font-weight:600;margin:4px 0 2px">${companyData.company}</div><div style="font-size:10px;color:var(--tx-1);margin-bottom:10px">${companyData.eng_name?companyData.eng_name+'<br>':''}${companyData.ceo?'대표: '+companyData.ceo:''}${companyData.corp_code?' · '+companyData.corp_code:''}</div><button class="btn-primary" onclick="startCollect()">👤 임원 수집 시작</button>`;}
+}
+function startCollect(){if(!whUrl){togCfg();return;}phase='collect';doSend();}
+initFromParams();
+
+/* ═══════════════════════════════════════════════
+   TIMER
+   ═══════════════════════════════════════════════ */
+function startTm(){t0=Date.now();tmr=setInterval(()=>{const s=Math.floor((Date.now()-t0)/1000);document.getElementById('tmBadge').textContent=`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;},1000);}
+function stopTm(){clearInterval(tmr);}
+
+/* ═══════════════════════════════════════════════
+   STATS
+   ═══════════════════════════════════════════════ */
+function bumpStat(k,n=1){S[k]=(S[k]||0)+n;const m={searches:'sN1',fetches:'sN2',hypotheses:'sN3',footprints:'sN4'};if(m[k])document.getElementById(m[k]).textContent=S[k];}
+
+// Update exec card's footer with live footprint/rapport/hypo counts
+function updateExecCard(name){
+  if(!name||name==='unknown')return;
+  const card=document.querySelector(`.exec-card[data-name="${CSS.escape(name)}"]`);
+  if(!card)return;
+  const fp=(footprintsByExec[name]||[]).length;
+  const rp=(rapportsByExec[name]||[]).length;
+  const hy=(hypoByExec[name]||[]).length;
+  const statusEl=card.querySelector('.ec-status');
+  if(statusEl){
+    const fpBadge=statusEl.querySelector('.ec-badge-fp');
+    const rpBadge=statusEl.querySelector('.ec-badge-rp');
+    const hyBadge=statusEl.querySelector('.ec-badge-hy');
+    if(fpBadge)fpBadge.textContent='👣 '+fp;
+    if(rpBadge)rpBadge.textContent='🤝 '+rp;
+    if(hyBadge)hyBadge.textContent='💡 '+hy;
+  }
+}
+
+// Mark exec card as currently being investigated
+function setExecActive(name){
+  document.querySelectorAll('.exec-card.profiling').forEach(c=>{
+    c.classList.remove('active-exec');
+    // Mark previous as investigated if it had data
+    const n=c.dataset.name;
+    if(n&&(footprintsByExec[n]||[]).length>0){
+      c.classList.add('investigated');
+      const fill=c.querySelector('.ec-prog-fill');
+      if(fill){fill.style.width='100%';fill.classList.add('done');}
+      const statusEl=c.querySelector('.ec-state-badge');
+      if(statusEl){statusEl.className='ec-badge ec-badge-done';statusEl.textContent='✓ 완료';}
+    }
+  });
+  const card=document.querySelector(`.exec-card[data-name="${CSS.escape(name)}"]`);
+  if(card){
+    card.classList.add('active-exec');
+    const fill=card.querySelector('.ec-prog-fill');
+    if(fill){fill.style.width='50%';fill.classList.remove('done');}
+    const statusEl=card.querySelector('.ec-state-badge');
+    if(statusEl){statusEl.className='ec-badge ec-badge-run';statusEl.innerHTML='<span class="ec-spinner"></span> 조사 중';}
+  }
+}
+
+// Open drawer filtered to a specific exec
+let selectedExecForDrawer=null;
+function openDrawerForExec(name){
+  selectedExecForDrawer=name;
+  // Highlight selected card
+  document.querySelectorAll('.exec-card.profiling').forEach(c=>c.classList.remove('selected-exec'));
+  const card=document.querySelector(`.exec-card[data-name="${CSS.escape(name)}"]`);
+  if(card)card.classList.add('selected-exec');
+
+  // Populate drawer with this exec's data
+  renderDrawerForExec(name);
+  openDrawer();
+}
+function renderDrawerForExec(name){
+  const fps=footprintsByExec[name]||[];
+  const rps=rapportsByExec[name]||[];
+  const hys=hypoByExec[name]||[];
+  // Update drawer header
+  const drawerHd=document.querySelector('.drawer-hd');
+  let nameTag=drawerHd.querySelector('.drawer-exec-name');
+  if(!nameTag){nameTag=ce('span','');nameTag.className='drawer-exec-name';nameTag.style.cssText='font-size:11px;font-weight:600;color:var(--tx-0);margin-left:4px';drawerHd.appendChild(nameTag);}
+  nameTag.textContent=name;
+
+  // Footprints tab
+  const fpList=document.getElementById('fpList');
+  const fpEmpty=document.getElementById('fpEmpty');
+  if(fps.length===0){fpList.style.display='none';fpEmpty.style.display='';fpEmpty.querySelector('.empty-tx').textContent=name+'의 발자국이 아직 없습니다';}
+  else{fpList.style.display='block';fpEmpty.style.display='none';fpList.innerHTML='';fps.forEach(d=>renderFpCard(fpList,d));}
+
+  // Rapport tab
+  const rpList=document.getElementById('rapportList');
+  const rpEmpty=document.getElementById('rapportEmpty');
+  if(rps.length===0){rpList.style.display='none';rpEmpty.style.display='';rpEmpty.querySelector('.empty-tx').textContent=name+'의 래포 키워드가 아직 없습니다';}
+  else{rpList.style.display='block';rpEmpty.style.display='none';rpList.innerHTML='';rps.forEach(d=>renderRapportCard(rpList,d));}
+
+  // Hypos tab
+  renderDrawerHypos(name);
+}
+
+function renderDrawerHypos(name){
+  const hys=hypoByExec[name]||[];
+  const list=document.getElementById('hyposList');
+  const empty=document.getElementById('hyposEmpty');
+  if(hys.length===0){list.style.display='none';empty.style.display='';empty.querySelector('.empty-tx').textContent=name+'의 가설이 아직 없습니다';}
+  else{
+    list.style.display='block';empty.style.display='none';list.innerHTML='';
+    hys.forEach(h=>{
+      const card=ce('div','hypo-drawer-card hypo-drawer-'+h.status);
+      card.innerHTML=`<div class="hypo-drawer-hd"><span class="hypo-id hypo-id-${h.status}">${h.id}</span><span class="hypo-drawer-status hypo-st-${h.status}">${h.status}</span></div><div class="hypo-drawer-tx">${esc(h.text)}</div>`;
+      list.appendChild(card);
+    });
+  }
+}
+// Render a single footprint card into a container
+function renderFpCard(container,data){
+  const conf=data.identity_confidence||'unverified';
+  const tags=(data.tags||[]).map(t=>{
+    const cls=t.category==='topic'?'fp-tag-topic':t.category==='activity'?'fp-tag-activity':t.category==='freshness'?(t.label==='최근1년'||t.label==='최근'?'fp-tag-fresh':'fp-tag-old'):'';
+    return`<span class="fp-tag ${cls}">${t.icon||''} ${t.label||''}</span>`;
+  }).join('');
+  const card=ce('div','fp-card');
+  const cardId='fp-'+Date.now()+'-'+Math.random().toString(36).substr(2,4);
+  const fpIdBadge=data.id?`<span class="fp-id-badge">${data.id}</span>`:'';
+  card.innerHTML=`<div class="fp-card-hd" onclick="toggleFpDetail('${cardId}')"><div class="fp-conf fp-conf-${conf}"></div><div class="fp-info"><div class="fp-title">${fpIdBadge}${esc(data.title||'')}</div><div class="fp-meta">${tags}<span class="fp-platform">${esc(data.platform||'')}</span></div></div></div><div class="fp-detail" id="${cardId}">${data.excerpt?`<div class="fp-excerpt">${esc(data.excerpt)}</div>`:''}${data.url?`<a class="fp-link" href="${esc(data.url)}" target="_blank">${esc(data.url)}</a>`:''}<div style="margin-top:4px;font-size:8px;color:var(--tx-3)">신원: ${conf}${data.confidence_basis?' · '+data.confidence_basis.join(', '):''}</div>${data.rapport_hint?`<div style="margin-top:3px;font-size:9px;color:var(--amber)">💡 ${esc(data.rapport_hint)}</div>`:''}</div>`;
+  container.appendChild(card);
+}
+function renderRapportCard(container,data){
+  const conf=data.confidence||'unverified';
+  const card=ce('div','rapport-card');
+  let basisHtml='';
+  if(data.basis&&data.basis.length){
+    // Basis items may contain FP-N references
+    basisHtml=`<div class="rapport-basis">근거: ${renderFootnotes(esc(data.basis.join(', ')))}</div>`;
+  }
+  card.innerHTML=`<div class="rapport-kw">${esc(data.keyword||'')}<span class="rapport-conf rapport-conf-${conf}">${conf}</span></div>${data.note?`<div class="rapport-note">${renderFootnotes(esc(data.note))}</div>`:''}${basisHtml}`;
+  container.appendChild(card);
+}
+
+/* ═══════════════════════════════════════════════
+   INVESTIGATION PANEL — UI builders
+   ═══════════════════════════════════════════════ */
+function clearWelc(){const w=document.getElementById('mainWelc');if(w)w.remove();}
+
+function mkPhase(ic,lb){
+  const norm=s=>s.trim().replace(/\s+/g,' ');const nlb=norm(lb);
+  const existing=$main.querySelectorAll('.ph');
+  for(const p of existing){const plb=p.querySelector('.ph-lb');if(plb&&norm(plb.textContent)===nlb)return p;}
+  existing.forEach(p=>{p.querySelectorAll('.stp-dot.running').forEach(d=>{d.classList.remove('running');d.classList.add('done');});});
+  const p=ce('div','ph');
+  p.innerHTML=`<div class="ph-hd"><span class="ph-ic">${ic}</span><span class="ph-lb">${lb}</span></div><div class="steps"></div>`;
+  $main.appendChild(p);si();
+  // Track current exec from phase label
+  // Try pattern: "이름 직책" or "이름 직책 — 설명"  
+  const titlePattern=/^(.+?)\s+(대표이사|사내이사|사외이사|이사|감사|CTO|CFO|COO|CIO|CMO|CPO|CDO|CHRO|CSO|CRO|부사장|전무|상무|부회장|회장|사장|이사회의장|감사위원|상임고문|고문|본부장|실장|센터장|팀장)/;
+  let nameMatch=lb.match(titlePattern);
+  if(nameMatch){
+    currentExecName=nameMatch[1].replace(/[—\-·]/g,'').trim();
+    if(phase==='profile')setExecActive(currentExecName);
+  } else {
+    // Fallback: try to find any confirmed exec name in the label
+    for(const ex of collectedExecs){
+      if(ex.name && lb.includes(ex.name)){
+        currentExecName=ex.name;
+        if(phase==='profile')setExecActive(currentExecName);
+        break;
+      }
+    }
+  }
+  return p;
+}
+
+function mkStep(ph,st,tx,sub=''){
+  if(!ph)return null;
+  const key=tx.replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim();
+  if(_seen.has(key)){const ex=ph.querySelector(`[data-sk="${CSS.escape(key)}"]`);if(ex){const d=ex.querySelector('.stp-dot');if(d)d.className='stp-dot '+st;}return ex;}
+  _seen.add(key);
+  const c=ph.querySelector('.steps'),pr=c.querySelector('.stp-dot.running');
+  if(pr){pr.classList.remove('running');pr.classList.add('done');}
+  const s=ce('div','stp');s.setAttribute('data-sk',key);
+  s.innerHTML=`<div class="stp-dot ${st}"></div><div class="stp-body"><div class="stp-tx">${tx}</div>${sub?`<div class="stp-sub">${sub}</div>`:''}</div>`;
+  c.appendChild(s);si();return s;
+}
+
+function mkDartCheck(ph,id,status,label){
+  const c=ph.querySelector('.steps');let el=c.querySelector(`[data-dart-id="${id}"]`);
+  const icons={searching:'⏳',found:'✅',not_found:'❌'};const ic=icons[status]||'⏳';
+  if(!el){el=ce('div','stp');el.setAttribute('data-dart-id',id);el.innerHTML=`<div class="stp-dot ${status==='searching'?'running':status==='found'?'done':'error'}"></div><div class="stp-body"><span>${ic} ${label}</span></div>`;c.appendChild(el);si();}
+  else{el.querySelector('.stp-dot').className=`stp-dot ${status==='searching'?'running':status==='found'?'done':'error'}`;el.querySelector('.stp-body').innerHTML=`<span>${ic} ${label}</span>`;}
+  return el;
+}
+
+function mkHypo(ph,id,status,tx){
+  const name=currentExecName||'unknown';
+  
+  if(hypoMap[id]){
+    // Update existing hypothesis
+    const h=hypoMap[id];h.status=status;h.text=tx;
+    const el=h.el;if(el){
+      el.querySelector('.hypo-id').className='hypo-id hypo-id-'+status;
+      el.querySelector('.hypo-id').textContent=id;
+      el.querySelector('.hypo-status').textContent=status;
+      el.querySelector('.hypo-tx').innerHTML=tx;
+      if(status==='confirmed')el.style.borderColor='rgba(52,211,153,0.15)';
+      else if(status==='refuted'){el.style.borderColor='rgba(248,113,113,0.15)';el.style.opacity='0.6';}
+    }
+    // Update in hypoByExec too
+    const execHypos=hypoByExec[h.execName]||[];
+    const idx=execHypos.findIndex(e=>e.id===id);
+    if(idx>=0)execHypos[idx].status=status;
+    // Update drawer if open for this exec
+    if(selectedExecForDrawer===h.execName)renderDrawerHypos(h.execName);
+    return;
+  }
+  
+  bumpStat('hypotheses');
+  // Track per-exec
+  if(!hypoByExec[name])hypoByExec[name]=[];
+  hypoByExec[name].push({id,status,text:tx});
+  updateExecCard(name);
+  
+  // Render in investigation panel
+  const c=ph?.querySelector('.steps')||$main;
+  const h=ce('div','hypo-card');
+  h.innerHTML=`<div class="hypo-hd"><span class="hypo-id hypo-id-${status}">${id}</span><span class="hypo-status">${status}</span></div><div class="hypo-tx">${tx}</div>`;
+  c.appendChild(h);si();
+  hypoMap[id]={status,text:tx,el:h,execName:name};
+  
+  // Update drawer if open for this exec
+  if(selectedExecForDrawer===name)renderDrawerHypos(name);
+}
+
+function mkDisc(ph,tx){
+  const key='D:'+tx.replace(/\s+/g,' ').trim();if(_seen.has(key))return;_seen.add(key);
+  const c=ph?.querySelector('.steps')||$main;
+  const d=ce('div','disc-box');d.innerHTML=`<div class="disc-lb">🎯 발견</div><div class="disc-tx">${tx}</div>`;
+  c.appendChild(d);si();
+}
+
+function mkBudget(data){
+  // data: {searches_used, searches_max, fetches_used, fetches_max}
+  const su=data.searches_used||0,sm=data.searches_max||1,fu=data.fetches_used||0,fm=data.fetches_max||1;
+  S.searches=su;S.fetches=fu;
+  document.getElementById('sN1').textContent=su;document.getElementById('sN2').textContent=fu;
+  let b=$main.querySelector('.budget-bar');
+  const pct=Math.round(((su+fu)/(sm+fm))*100);
+  if(!b){b=ce('div','budget-bar');b.innerHTML=`<span class="budget-label">🔍 ${su}/${sm} · 📖 ${fu}/${fm}</span><div class="budget-gauge"><div class="budget-fill"></div></div><span class="budget-pct">${pct}%</span>`;$main.appendChild(b);}
+  else{b.querySelector('.budget-label').textContent=`🔍 ${su}/${sm} · 📖 ${fu}/${fm}`;b.querySelector('.budget-pct').textContent=pct+'%';}
+  b.querySelector('.budget-fill').style.width=pct+'%';si();
+}
+
+function mkProg(lb,pct,indeterminate=false){
+  let b=$main.querySelector('.prog');
+  if(!b){b=ce('div','prog');b.innerHTML=`<div class="prog-top"><span class="prog-lb-tx"></span><span class="prog-lb-pct"></span></div><div class="prog-bar"><div class="prog-fill"></div></div>`;$main.appendChild(b);}
+  const fill=b.querySelector('.prog-fill');
+  if(indeterminate&&pct===0){fill.classList.add('indeterminate');b.querySelector('.prog-lb-tx').textContent='조사 진행 중';b.querySelector('.prog-lb-pct').textContent='';}
+  else{fill.classList.remove('indeterminate');fill.style.width=pct+'%';b.querySelector('.prog-lb-tx').textContent=lb;b.querySelector('.prog-lb-pct').textContent=pct+'%';}
+  si();
+}
+
+/* ═══════════════════════════════════════════════
+   DRAWER — Footprint rendering
+   ═══════════════════════════════════════════════ */
+function addFootprint(data){
+  // ═══ FP DEDUPLICATION ═══
+  // 1. URL dedup
+  if(data.url){
+    const normUrl=data.url.replace(/\/$/,'').replace(/^https?:\/\/(www\.)?/,'').toLowerCase();
+    if(fpSeenUrls.has(normUrl)){console.log('[FP DEDUP] URL skip:',data.url);return;}
+    fpSeenUrls.add(normUrl);
+  }
+  // 2. Title keyword dedup — extract words, check jaccard overlap
+  const titleWords=(data.title||'').replace(/[^\w가-힣]/g,' ').split(/\s+/).filter(w=>w.length>1);
+  const titleKey=titleWords.sort().join(' ').toLowerCase();
+  if(titleKey){
+    // Check similarity against all seen keys
+    let isDup=false;
+    for(const seen of fpSeenKeys){
+      const seenWords=new Set(seen.split(' '));
+      const curWords=new Set(titleKey.split(' '));
+      const intersection=[...curWords].filter(w=>seenWords.has(w)).length;
+      const union=new Set([...curWords,...seenWords]).size;
+      const jaccard=union>0?intersection/union:0;
+      if(jaccard>0.5){isDup=true;console.log('[FP DEDUP] Title skip:',data.title,'(jaccard='+jaccard.toFixed(2)+')');break;}
+    }
+    if(isDup)return;
+    fpSeenKeys.add(titleKey);
+  }
+  // 3. Override agent's FP ID with our sequential counter
+  fpGlobalId++;
+  data.id='FP-'+fpGlobalId;
+  // ═══ END DEDUP ═══
+
+  const name=currentExecName||'unknown';
+  if(!footprintsByExec[name])footprintsByExec[name]=[];
+  footprintsByExec[name].push(data);
+  bumpStat('footprints');
+  // Update exec card counter
+  updateExecCard(name);
+  // If drawer is open for this exec, live-append the card
+  if(selectedExecForDrawer===name){
+    const fpList=document.getElementById('fpList');
+    const fpEmpty=document.getElementById('fpEmpty');
+    fpEmpty.style.display='none';fpList.style.display='block';
+    renderFpCard(fpList,data);
+  }
+  // Add step in investigation panel for visibility
+  const lastPh=$main.querySelector('.ph:last-child');
+  if(lastPh){
+    const conf=data.identity_confidence||'?';
+    const confIcon=conf==='confirmed'?'✅':conf==='high'?'🟢':conf==='probable'?'🟡':'⚪';
+    mkStep(lastPh,'done',`<span class="found">👣 ${esc(data.id||'')}</span> ${esc(data.title||'')} <span style="opacity:.5">${confIcon} ${esc(data.platform||'')}</span>`);
+  }
+  // Also add as reference
+  if(data.url)addRef(data.title||'footprint',data.url,data.platform==='news'?'news':'web');
+}
+function toggleFpDetail(id){document.getElementById(id)?.classList.toggle('open');}
+
+/* ═══════════════════════════════════════════════
+   DRAWER — Rapport rendering
+   ═══════════════════════════════════════════════ */
+function addRapport(data){
+  const name=currentExecName||'unknown';
+  if(!rapportsByExec[name])rapportsByExec[name]=[];
+  rapportsByExec[name].push(data);
+  S.rapports++;
+  updateExecCard(name);
+  // If drawer is open for this exec, live-append
+  if(selectedExecForDrawer===name){
+    const rpList=document.getElementById('rapportList');
+    const rpEmpty=document.getElementById('rapportEmpty');
+    rpEmpty.style.display='none';rpList.style.display='block';
+    renderRapportCard(rpList,data);
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   DRAWER — Briefing rendering
+   ═══════════════════════════════════════════════ */
+let briefingBuf=null;
+function addBriefing(text){
+  const list=document.getElementById('briefingList');
+  document.getElementById('briefingEmpty').style.display='none';
+  list.style.display='block';
+  // Markdown-ish rendering + [FP-N] footnote links
+  let html=text
+    .replace(/## (.+)/g,'<h2>$1</h2>')
+    .replace(/### (.+)/g,'<h3>$1</h3>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\n- /g,'\n<li>')
+    .replace(/\n(\d+)\. /g,'\n<li>')
+    .replace(/\n/g,'<br>');
+  // Convert [FP-N] footnotes to clickable badges
+  html=renderFootnotes(html);
+  const box=ce('div','briefing-box');box.innerHTML=html;
+  list.appendChild(box);
+}
+
+// Convert [FP-1][FP-2] references to clickable footnote badges
+function renderFootnotes(html){
+  return html.replace(/\[FP-(\d+)\]/g,(match,n)=>{
+    return `<span class="fn-badge" onclick="scrollToFootprint('FP-${n}')" title="발자국 FP-${n} 보기">[${n}]</span>`;
+  });
+}
+
+// Scroll to and highlight a footprint card in the drawer
+function scrollToFootprint(fpId){
+  // Find which exec has this footprint
+  for(const[name,fps]of Object.entries(footprintsByExec)){
+    const fp=fps.find(f=>f.id===fpId);
+    if(fp){
+      openDrawerForExec(name);
+      // Switch to footprints tab
+      const tab=document.querySelector('.drawer-tab[data-tab="footprints"]');
+      if(tab)switchTab(tab);
+      // Find and highlight the card
+      setTimeout(()=>{
+        const cards=document.querySelectorAll('.fp-card');
+        for(const card of cards){
+          const title=card.querySelector('.fp-title');
+          if(title&&title.textContent===fp.title){
+            card.style.boxShadow='0 0 0 2px var(--accent)';
+            card.scrollIntoView({behavior:'smooth',block:'center'});
+            // Open detail
+            const detail=card.querySelector('.fp-detail');
+            if(detail)detail.classList.add('open');
+            setTimeout(()=>card.style.boxShadow='',3000);
+            break;
+          }
+        }
+      },200);
+      return;
+    }
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   DRAWER — References
+   ═══════════════════════════════════════════════ */
+function addRef(title,url,type='web'){
+  const key='R:'+title+url;if(_seen.has(key))return;_seen.add(key);refN++;
+  // Refs are stored for reference but no longer have a separate tab
+}
+
+/* ═══════════════════════════════════════════════
+   SEND / CONNECT
+   ═══════════════════════════════════════════════ */
+function startCollect(){if(!whUrl){togCfg();return;}phase='collect';doSend();}
+async function doSend(){
+  let payload;
+  if(companyData&&phase==='collect'){payload={...companyData,action:'collect',sessionId:sid};}
+  else return;
+  if(!whUrl&&!demo){togCfg();return;}
+  busy=true;clearWelc();startTm();
+  document.getElementById('statsBar').style.display='flex';
+  S={searches:0,fetches:0,hypotheses:0,footprints:0,rapports:0};refN=0;
+  ['sN1','sN2','sN3','sN4'].forEach(id=>document.getElementById(id).textContent='0');
+  if(demo)await runDemo();
+  else await runLive(payload);
+  stopTm();busy=false;
+}
+
+/* ═══════════════════════════════════════════════
+   LIVE STREAMING — v0.4 tag parser
+   ═══════════════════════════════════════════════ */
+function parseLine(line,ctx){
+  const x=line.trim();if(!x)return;
+
+  // EXEC_LIST buffering
+  if(x==='<<EXEC_LIST_START>>'){execListBuf='';return;}
+  if(x==='<<EXEC_LIST_END>>'){if(execListBuf!==null){try{collectedExecs=JSON.parse(execListBuf);renderExecList(collectedExecs);}catch(e){console.error('EXEC_LIST parse',e);}execListBuf=null;}return;}
+  if(execListBuf!==null){execListBuf+=x+'\n';return;}
+
+  // BRIEFING buffering
+  if(x==='<<BRIEFING_START>>'){briefingBuf='';return;}
+  if(x==='<<BRIEFING_END>>'){if(briefingBuf!==null){addBriefing(briefingBuf);briefingBuf=null;}return;}
+  if(briefingBuf!==null){briefingBuf+=line+'\n';return;}
+
+  let m;
+  // v0.4 tags
+  if((m=x.match(/^<<PHASE:(.+?)>>\s*(.+)/)))       ctx.ap=mkPhase(m[1],m[2]);
+  else if((m=x.match(/^<<DART:(.+?):(.+?)>>\s*(.+)/))) mkDartCheck(ctx.ap||mkPhase('📊','DART'),m[1],m[2],m[3]);
+  else if((m=x.match(/^<<STEP:(running|done|error|hypo)>>\s*(.+)/))) mkStep(ctx.ap,m[1],m[2]);
+  else if((m=x.match(/^<<HYPO:(\w+):(\w+)>>\s*(.+)/))) mkHypo(ctx.ap,m[1],m[2],m[3]);
+  else if((m=x.match(/^<<HYPO>>\s*(.+)/)))          mkHypo(ctx.ap,'H'+(S.hypotheses+1),'active',m[1]); // legacy format
+  else if((m=x.match(/^<<DISCOVERY>>\s*(.+)/)))     mkDisc(ctx.ap,m[1]);
+  else if((m=x.match(/^<<DISC>>\s*(.+)/)))          mkDisc(ctx.ap,m[1]);
+  else if((m=x.match(/^<<BUDGET>>\s*(.+)/)))        {try{mkBudget(JSON.parse(m[1]));}catch(e){}}
+  else if((m=x.match(/^<<PROGRESS:(\d+)>>\s*(.+)/)))mkProg(m[2],+m[1]);
+  else if((m=x.match(/^<<PROG:(\d+)>>\s*(.+)/)))   mkProg(m[2],+m[1]);
+  else if((m=x.match(/^<<FOOTPRINT>>/)))             {/* start — next line is JSON, handled below */}
+  else if((m=x.match(/^<<END_FOOTPRINT>>/)))         {/* end */}
+  else if((m=x.match(/^<<RAPPORT>>\s*(.+)/)))        {console.log('[RAPPORT RAW]',m[1]);try{addRapport(JSON.parse(m[1]));}catch(e){console.error('[RAPPORT PARSE ERROR]',e,m[1]);}}
+  else if((m=x.match(/^<<REF:(.+?)>>\s*(.+)/)))     {const pts=m[2].split('|');addRef(pts[0]?.trim(),pts[1]?.trim()||'',m[1]);}
+  // Legacy v0.3.1 profile tags — pass through to investigation panel as steps
+  else if((m=x.match(/^<<PROFILE:(.+?)>>/)))         {const[n]=m[1].split('|');mkStep(ctx.ap,'done','프로필 생성: '+n);}
+  else if(x.startsWith('{')&&x.includes('"type"')){
+    // Inline JSON — try as FOOTPRINT data
+    try{const d=JSON.parse(x);if(d.type&&d.title){addFootprint(d);}}catch(e){}
+  }
+}
+
+// Special: FOOTPRINT is multi-line (<<FOOTPRINT>> then JSON then <<END_FOOTPRINT>>)
+let fpJsonBuf=null;
+
+async function runLive(payload){
+  _seen.clear();fpJsonBuf=null;briefingBuf=null;
+  const targetUrl=payload._webhookOverride||whUrl;delete payload._webhookOverride;
+  const p=mkPhase('🚀','Connecting');mkStep(p,'running','에이전트에 요청 전송 중');
+  try{
+    const res=await fetch(targetUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    mkStep(p,'done','연결 성공');mkProg('수집 완료',0,true);
+    
+
+    const rd=res.body.getReader(),dc=new TextDecoder();
+    let rawBuf='',textBuf='';
+    let ctx={ap:p};
+
+    while(true){
+      const{done,value}=await rd.read();if(done)break;
+      rawBuf+=dc.decode(value,{stream:true});
+      
+      // Try batch array format first: [{"output":"..."}]
+      let batchParsed=false;
+      const trimmed=rawBuf.trim();
+      if(trimmed.startsWith('[')){
+        try{
+          const arr=JSON.parse(trimmed);
+          if(Array.isArray(arr)){arr.forEach(o=>{if(typeof o.output==='string')textBuf+=o.output;});batchParsed=true;rawBuf='';}
+        }catch(e){/* incomplete array, keep buffering */}
+      }
+      
+      // Streaming format: {"type":"item","content":"..."}{"type":"item",...}
+      if(!batchParsed){
+        const chunks=rawBuf.split(/\}\s*\{/).map((s,i,a)=>{if(a.length===1)return s;if(i===0)return s+'}';if(i===a.length-1)return'{'+s;return'{'+s+'}';});
+        const lastRaw=rawBuf.trimEnd();
+        if(lastRaw.endsWith('}')){rawBuf='';}else{rawBuf=chunks.pop()||'';}
+        for(const ch of chunks){
+          try{
+            const obj=JSON.parse(ch);
+            if(obj.type==='item'&&typeof obj.content==='string')textBuf+=obj.content;
+            else if(typeof obj.output==='string')textBuf+=obj.output;
+          }catch(e){}
+        }
+      }
+
+      const lines=textBuf.split('\n');textBuf=lines.pop()||'';
+      for(const line of lines){
+        const tr=line.trim();
+        // EXEC_LIST
+        if(tr==='<<EXEC_LIST_START>>'){execListBuf='';continue;}
+        if(tr==='<<EXEC_LIST_END>>'){if(execListBuf!==null){try{collectedExecs=JSON.parse(execListBuf);renderExecList(collectedExecs);}catch(e){console.error(e);}execListBuf=null;}continue;}
+        if(execListBuf!==null){execListBuf+=line+'\n';continue;}
+        // FOOTPRINT JSON buffering
+        if(tr==='<<FOOTPRINT>>'){fpJsonBuf='';continue;}
+        if(tr==='<<END_FOOTPRINT>>'){if(fpJsonBuf!==null){try{addFootprint(JSON.parse(fpJsonBuf));}catch(e){console.error('FP parse',e,fpJsonBuf);}fpJsonBuf=null;}continue;}
+        if(fpJsonBuf!==null){
+          // Safety: if we see any new << tag while buffering FP JSON, the previous FP was never closed
+          if(tr.startsWith('<<')){
+            console.warn('[FP SAFETY] Force-closing unclosed FOOTPRINT buffer');
+            try{addFootprint(JSON.parse(fpJsonBuf));}catch(e){console.warn('FP partial parse failed',fpJsonBuf.substring(0,100));}
+            fpJsonBuf=null;
+            // Fall through to process this line normally (don't continue)
+          } else {
+            fpJsonBuf+=tr;continue;
+          }
+        }
+        // BRIEFING
+        if(tr==='<<BRIEFING_START>>'){briefingBuf='';continue;}
+        if(tr==='<<BRIEFING_END>>'){addBriefing(briefingBuf);briefingBuf=null;continue;}
+        if(briefingBuf!==null){briefingBuf+=line+'\n';continue;}
+
+        parseLine(line,ctx);
+      }
+    }
+    if(textBuf.trim()){if(fpJsonBuf!==null)fpJsonBuf+=textBuf;else if(briefingBuf!==null)briefingBuf+=textBuf;else if(execListBuf!==null)execListBuf+=textBuf;else parseLine(textBuf,ctx);}
+    // Fallback: if EXEC_LIST was started but never ended (truncated output)
+    if(execListBuf!==null&&execListBuf.trim()){
+      console.warn('EXEC_LIST truncated — attempting partial parse');
+      let buf=execListBuf.trim();
+      // Try to close the JSON array if it was cut off mid-object
+      if(!buf.endsWith(']')){
+        // Remove trailing incomplete object
+        const lastComplete=buf.lastIndexOf('}');
+        if(lastComplete>0)buf=buf.substring(0,lastComplete+1);
+        if(!buf.endsWith(']'))buf+=']';
+      }
+      try{collectedExecs=JSON.parse(buf);renderExecList(collectedExecs);console.log('Recovered',collectedExecs.length,'execs from truncated list');}
+      catch(e){console.error('Could not recover truncated EXEC_LIST',e);}
+      execListBuf=null;
+    }
+    // Fallback: if FOOTPRINT was started but never ended
+    if(fpJsonBuf!==null&&fpJsonBuf.trim()){
+      console.warn('FOOTPRINT truncated — attempting parse');
+      try{addFootprint(JSON.parse(fpJsonBuf));}catch(e){console.warn('Could not recover truncated FP');}
+      fpJsonBuf=null;
+    }
+  }catch(e){mkStep(p||mkPhase('❌','Error'),'error','연결 오류: '+e.message);}
+  // Cleanup animations
+  $main.querySelectorAll('.stp-dot.running').forEach(d=>{d.classList.remove('running');d.classList.add('done');});
+  const pf=$main.querySelector('.prog-fill');if(pf){pf.classList.remove('indeterminate');if(pf.style.width!=='100%'){const pb=pf.closest('.prog');if(pb)pb.querySelector('.prog-lb-tx').textContent='완료';pf.style.width='100%';}}
+  // Mark all profiling cards as done (including ones that may still be active/spinning)
+  document.querySelectorAll('.exec-card.profiling').forEach(c=>{
+    c.classList.remove('active-exec');c.classList.add('investigated');
+    const fill=c.querySelector('.ec-prog-fill');if(fill){fill.style.width='100%';fill.classList.add('done');}
+    const badge=c.querySelector('.ec-state-badge');if(badge){badge.className='ec-badge ec-badge-done';badge.textContent='✓ 완료';}
+    // Stop spinner animation
+    const spinner=c.querySelector('.ec-spinner');if(spinner)spinner.remove();
+  });
+  _seen.clear();
+}
+
+/* ═══════════════════════════════════════════════
+   EXEC LIST — HITL
+   ═══════════════════════════════════════════════ */
+function renderExecList(execs){
+  phase='review';
+  mkProg('수집 완료',100);
+  // Render in main panel
+  const hd=ce('div','exec-list-hd');
+  hd.innerHTML=`<div class="exec-list-hd-tt">👤 수집된 임원 목록</div><div class="exec-list-hd-sub">${companyData?.company||''} · ${execs.length}명 · 체크 해제하면 프로파일링에서 제외</div>`;
+  $main.appendChild(hd);
+
+  const list=ce('div');list.id='execListCards';
+  execs.forEach((ex,i)=>{
+    const conf=ex.confidence||'medium';
+    const confC=conf==='high'?'var(--green)':conf==='medium'?'var(--amber)':'var(--red)';
+    const confBg=conf==='high'?'var(--green-bg)':conf==='medium'?'var(--amber-bg)':'var(--red-bg)';
+    const card=ce('div','exec-card');card.dataset.idx=i;card.dataset.name=ex.name;
+    card.innerHTML=`<label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer"><input type="checkbox" checked data-exec-idx="${i}" style="margin-top:3px;accent-color:var(--accent)"><div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span style="font-size:12px;font-weight:600">${esc(ex.name)}</span><span style="font-size:9px;padding:1px 5px;border-radius:3px;background:${confBg};color:${confC}">${conf}</span><span style="font-size:9px;color:var(--tx-2)">${esc(ex.source||'')}</span></div><div style="font-size:10px;color:var(--tx-1);margin-top:2px">${esc(ex.title||'')}</div>${ex.is_registered?`<div style="font-size:9px;color:var(--tx-2);margin-top:1px">${esc(ex.is_registered)}</div>`:''}</div></label>`;
+    list.appendChild(card);
+  });
+  $main.appendChild(list);
+
+  const bar=ce('div','exec-actions');bar.id='execActionBar';
+  bar.innerHTML=`<div style="font-size:10px;color:var(--tx-2)" id="execSelCount">${execs.length}명 선택됨</div><div style="display:flex;gap:6px"><button class="btn-secondary" onclick="addExecManual()">+ 수동 추가</button><button class="btn-primary" onclick="confirmExecs()">프로파일링 시작 →</button></div>`;
+  $main.appendChild(bar);si();
+
+  list.addEventListener('change',e=>{if(e.target.type==='checkbox'){const cnt=list.querySelectorAll('input[type=checkbox]:checked').length;document.getElementById('execSelCount').textContent=cnt+'명 선택됨';}});
+}
+
+function addExecManual(){
+  const list=document.getElementById('execListCards');if(!list)return;
+  const i=collectedExecs.length;collectedExecs.push({name:'',title:'',source:'manual',confidence:'low'});
+  const card=ce('div','exec-card');card.dataset.idx=i;
+  card.innerHTML=`<label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer"><input type="checkbox" checked data-exec-idx="${i}" style="margin-top:3px;accent-color:var(--accent)"><div style="flex:1;display:flex;flex-direction:column;gap:3px"><input type="text" placeholder="이름" data-field="name" data-eidx="${i}" style="padding:3px 7px;font-size:11px;border:1px solid var(--border);border-radius:4px;background:var(--bg-2);color:var(--tx-0);outline:none"><input type="text" placeholder="직책" data-field="title" data-eidx="${i}" style="padding:3px 7px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--bg-2);color:var(--tx-0);outline:none"><span style="font-size:9px;color:var(--tx-2)">수동 추가</span></div></label>`;
+  list.appendChild(card);card.querySelector('input[type=text]').focus();
+  const cnt=list.querySelectorAll('input[type=checkbox]:checked').length;
+  document.getElementById('execSelCount').textContent=cnt+'명 선택됨';
+}
+
+function confirmExecs(){
+  const list=document.getElementById('execListCards');if(!list)return;
+  const checked=list.querySelectorAll('input[type=checkbox]:checked');
+  const confirmed=[];
+  checked.forEach(cb=>{const idx=parseInt(cb.dataset.execIdx);const ex={...collectedExecs[idx]};const card=cb.closest('.exec-card');const ni=card?.querySelector('input[data-field="name"]'),ti=card?.querySelector('input[data-field="title"]');if(ni)ex.name=ni.value.trim();if(ti)ex.title=ti.value.trim();if(ex.name)confirmed.push(ex);});
+  if(!confirmed.length){alert('최소 1명을 선택하세요.');return;}
+
+  phase='profile';
+  const profileUrl=whUrl.replace('/collect','/profile');
+  const profilePayload={...companyData,action:'profile',sessionId:sid,executives:confirmed};
+
+  // Clean up exec list UI — transform cards to profiling mode
+  const ab=document.getElementById('execActionBar');if(ab)ab.style.display='none';
+  $main.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.disabled=true);
+  
+  // Transform confirmed exec cards into profiling mode
+  const allCards=document.querySelectorAll('.exec-card');
+  allCards.forEach(card=>{
+    const idx=parseInt(card.dataset.idx);
+    const isConfirmed=confirmed.some(c=>c.name===collectedExecs[idx]?.name);
+    if(!isConfirmed){card.style.opacity='0.3';card.style.pointerEvents='none';return;}
+    const name=card.dataset.name||collectedExecs[idx]?.name||'';
+    // Ensure data-name is set (especially for manual cards)
+    if(!card.dataset.name&&name)card.dataset.name=name;
+    card.classList.add('profiling');
+    // Add status row and progress bar
+    const statusRow=ce('div','ec-status');
+    statusRow.innerHTML=`<span class="ec-badge ec-badge-wait ec-state-badge">대기</span><span class="ec-badge ec-badge-fp">👣 0</span><span class="ec-badge ec-badge-hy">💡 0</span><span class="ec-badge ec-badge-rp">🤝 0</span>`;
+    card.appendChild(statusRow);
+    const progBar=ce('div','ec-prog');progBar.innerHTML='<div class="ec-prog-fill"></div>';
+    card.appendChild(progBar);
+    // Click handler — open drawer for this exec
+    card.addEventListener('click',e=>{
+      if(e.target.tagName==='INPUT')return; // don't hijack checkbox
+      openDrawerForExec(name);
+    });
+  });
+
+  const div=ce('div','');div.style.cssText='border-top:1px solid var(--accent-line);margin:14px 0;padding-top:10px';
+  div.innerHTML='<div style="font-size:11px;color:var(--accent);font-weight:600">🔍 프로파일링 시작 — 임원 카드를 클릭하면 상세 결과를 볼 수 있습니다</div>';
+  $main.appendChild(div);si();
+  startTm();busy=true;_seen.clear();
+
+  (async()=>{
+    try{
+      await runLive({...profilePayload,_webhookOverride:profileUrl});
+    }catch(e){console.error(e);}
+    stopTm();busy=false;
+  })();
+}
+
+/* ═══════════════════════════════════════════════
+   DEMO
+   ═══════════════════════════════════════════════ */
+async function runDemo(){
+  const co=companyData?.company||'삼성전자';
+  
+  const p1=mkPhase('🚀','Initialization');await dl(300);
+  mkStep(p1,'running','에이전트 연결 중');await dl(500);
+  mkStep(p1,'done','연결 성공');
+  mkStep(p1,'running','DART 공시 조회 중');await dl(800);
+  mkStep(p1,'done','DART 보고서 확인 완료');
+  mkProg('수집 중',20,false);await dl(400);
+  mkStep(p1,'done','임원 5명 수집 완료');
+  mkProg('수집 완료',100);
+  // Simulate exec list
+  collectedExecs=[{name:'김철수',title:'대표이사',source:'dart',confidence:'high'},{name:'이영희',title:'CTO',source:'dart',confidence:'high'},{name:'박민수',title:'CFO',source:'dart',confidence:'medium'}];
+  renderExecList(collectedExecs);
+}
+
+/* ═══════════════════════════════════════════════
+   UTIL
+   ═══════════════════════════════════════════════ */
+function ce(t,c){const e=document.createElement(t);if(c)e.className=c;return e;}
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+function dl(ms){return new Promise(r=>setTimeout(r,ms));}
+function si(){$main.scrollTo({top:$main.scrollHeight,behavior:'smooth'});}
+</script>
+</body>
+</html>

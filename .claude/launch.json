@@ -1,0 +1,14 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "wreporter",
+      "runtimeExecutable": "C:\\OY\\wreporter\\.venv\\Scripts\\python",
+      "runtimeArgs": ["-m", "reflex", "run"],
+      "port": 3000,
+      "env": {
+        "BACKEND_PORT": "8002"
+      }
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "status": "000",
+  "message": "정상",
+  "list": [
+    {
+      "rcept_no": "20240312000578",
+      "reprt_code": "11011",
+      "corp_cls": "Y",
+      "corp_code": "00126380",
+      "corp_name": "삼성전자",
+      "nm": "이재용",
+      "sexdstn": "남",
+      "birth_ym": "196810",
+      "ofcps": "이사회 의장",
+      "rgit_exctv_at": "Y",
+      "fte_at": "N",
+      "chrg_job": "",
+      "main_career": "삼성전자(주) 부회장",
+      "mxmm_shrholdr_relate": "본인",
+      "hffc_pd": "2023.03.15 ~ 2026.03.14",
+      "tenure_end_on": ""
+    },
+    {
+      "rcept_no": "20240312000578",
+      "reprt_code": "11011",
+      "corp_cls": "Y",
+      "corp_code": "00126380",
+      "corp_name": "삼성전자",
+      "nm": "한종희",
+      "sexdstn": "남",
+      "birth_ym": "196210",
+      "ofcps": "대표이사 부회장",
+      "rgit_exctv_at": "Y",
+      "fte_at": "Y",
+      "chrg_job": "DX부문장",
+      "main_career": "삼성전자(주) 영상디스플레이사업부장",
+      "mxmm_shrholdr_relate": "",
+      "hffc_pd": "2022.03.16 ~ 2025.03.15",
+      "tenure_end_on": ""
+    },
+    {
+      "rcept_no": "20240312000578",
+      "reprt_code": "11011",
+      "corp_cls": "Y",
+      "corp_code": "00126380",
+      "corp_name": "삼성전자",
+      "nm": "경계현",
+      "sexdstn": "남",
+      "birth_ym": "196404",
+      "ofcps": "대표이사 사장",
+      "rgit_exctv_at": "Y",
+      "fte_at": "Y",
+      "chrg_job": "DS부문장",
+      "main_career": "삼성전자(주) 시스템LSI사업부장",
+      "mxmm_shrholdr_relate": "",
+      "hffc_pd": "2022.03.16 ~ 2025.03.15",
+      "tenure_end_on": ""
+    }
+  ]
+}
