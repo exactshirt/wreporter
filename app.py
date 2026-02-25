@@ -10,6 +10,8 @@ from __future__ import annotations
 from dotenv import load_dotenv
 load_dotenv(override=True)
 
+import json
+
 import chainlit as cl
 
 from chainlit_app.handlers import handle_research, handle_chat_message
@@ -36,18 +38,15 @@ async def chat_profiles():
     return [
         cl.ChatProfile(
             name="일반정보",
-            markdown_description="기업 개요·사업 현황·뉴스 등 일반 정보를 분석합니다.",
-            icon="/public/logo.png",
+            markdown_description="기업 개요 · AX 동향 · 사업 현황 · 영업 인사이트",
         ),
         cl.ChatProfile(
             name="재무정보",
-            markdown_description="재무제표·수익성·안정성 등 재무 지표를 분석합니다.",
-            icon="/public/logo.png",
+            markdown_description="재무제표 · 수익성 · 건전성 · 투자여력",
         ),
         cl.ChatProfile(
             name="임원정보",
-            markdown_description="등기임원·주요주주·보수 현황 등 임원 정보를 분석합니다.",
-            icon="/public/logo.png",
+            markdown_description="임원 리스트 · 의사결정 구조 · 인물 프로파일링",
         ),
     ]
 
@@ -92,8 +91,19 @@ async def on_message(message: cl.Message):
         return
 
     # /조사 명령어 → 조사 시작
-    if content == "/조사":
+    if content in ("/조사", "/research", "/start"):
         await handle_research()
+        return
+
+    # /핀 명령어 → 핀 목록 표시
+    if content in ("/핀", "/pins"):
+        await render_pin_list()
+        return
+
+    # /검색 명령어 → 기업 검색
+    if content.startswith("/검색 ") or content.startswith("/search "):
+        keyword = content.split(" ", 1)[1].strip()
+        await search_and_pin(keyword)
         return
 
     # 일반 채팅
@@ -104,8 +114,6 @@ async def on_message(message: cl.Message):
 @cl.action_callback("select_company")
 async def on_select_company(action: cl.Action):
     """검색 결과에서 기업 선택."""
-    import json
-
     company = json.loads(action.payload)
     cl.user_session.set("active_company", company)
 
@@ -116,9 +124,26 @@ async def on_select_company(action: cl.Action):
         await pin_company(company)
 
     agent_type = cl.user_session.get("agent_type", "general")
+    label = _AGENT_LABELS.get(agent_type, agent_type)
+    corp_name = company.get("corp_name", "")
+    market = company.get("market_label", "")
+    market_str = f" · {market}" if market else ""
+
+    actions = [
+        cl.Action(
+            name="start_research",
+            payload={"agent_type": agent_type},
+            label=f"🔍 {label} 조사 시작",
+        ),
+    ]
+
     await cl.Message(
-        content=f"**{company.get('corp_name', '')}** 가 선택되었습니다.\n"
-        f"`/조사` 를 입력하면 {_agent_label(agent_type)} 분석을 시작합니다.",
+        content=(
+            f"## ✅ {corp_name}{market_str} 선택됨\n\n"
+            f"**{label}** 에이전트로 분석할 준비가 되었습니다.\n\n"
+            f"`🔍 {label} 조사 시작` 버튼을 클릭하거나, 원하는 내용을 직접 입력하세요."
+        ),
+        actions=actions,
     ).send()
 
 
@@ -131,7 +156,6 @@ async def on_start_research(action: cl.Action):
 @cl.action_callback("suggestion")
 async def on_suggestion(action: cl.Action):
     """추천 질문 클릭."""
-    import json
     try:
         data = json.loads(action.payload) if isinstance(action.payload, str) else action.payload
         query = data.get("query", "") if isinstance(data, dict) else str(data)
@@ -144,16 +168,31 @@ async def on_suggestion(action: cl.Action):
 @cl.action_callback("pin_company")
 async def on_pin_company(action: cl.Action):
     """기업 핀 추가."""
-    import json
-
     company = json.loads(action.payload)
     await pin_company(company)
     # 선택도 함께 수행
     cl.user_session.set("active_company", company)
+
     agent_type = cl.user_session.get("agent_type", "general")
+    label = _AGENT_LABELS.get(agent_type, agent_type)
+    corp_name = company.get("corp_name", "")
+    market = company.get("market_label", "")
+    market_str = f" · {market}" if market else ""
+
+    actions = [
+        cl.Action(
+            name="start_research",
+            payload={"agent_type": agent_type},
+            label=f"🔍 {label} 조사 시작",
+        ),
+    ]
+
     await cl.Message(
-        content=f"📌 **{company.get('corp_name', '')}**가 핀 추가 및 선택되었습니다.\n"
-        f"`/조사`를 입력하면 {_agent_label(agent_type)} 분석을 시작합니다.",
+        content=(
+            f"## 📌 {corp_name}{market_str} 핀 추가 완료\n\n"
+            f"**{label}** 에이전트로 분석할 준비가 되었습니다."
+        ),
+        actions=actions,
     ).send()
 
 
@@ -166,7 +205,11 @@ async def on_unpin_company(action: cl.Action):
         # 현재 활성 기업이 언핀된 기업이면 해제
         active = cl.user_session.get("active_company")
         if active and active.get("jurir_no") == jurir_no:
-            cl.user_session.set("active_company", None)
+            pins = cl.user_session.get("pins") or []
+            if pins:
+                cl.user_session.set("active_company", pins[0])
+            else:
+                cl.user_session.set("active_company", None)
 
 
 # ── 헬퍼 ─────────────────────────────────────────────────────────
@@ -175,7 +218,3 @@ _AGENT_LABELS = {
     "finance": "재무정보",
     "executives": "임원정보",
 }
-
-
-def _agent_label(agent_type: str) -> str:
-    return _AGENT_LABELS.get(agent_type, agent_type)

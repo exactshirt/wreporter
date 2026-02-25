@@ -14,7 +14,7 @@ import asyncio
 # 힌트: 일반 함수와 거의 같지만, def 앞에 async를 붙이면 됩니다.
 
 async def my_first_async():
-    print("hello")
+    return("hello")
 
 
 def test_my_first_async():
@@ -57,7 +57,7 @@ async def get_role():
 
 
 async def get_profile():
-    return asyncio.gather(get_name(), get_role())  # <-- 여기를 수정. get_name()과 get_role()을 동시에 실행하세요
+    return await asyncio.gather(get_name(), get_role())  # <-- 여기를 수정. get_name()과 get_role()을 동시에 실행하세요
 
 
 def test_get_profile():

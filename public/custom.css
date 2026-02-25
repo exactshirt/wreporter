@@ -1,5 +1,332 @@
-.markdown-body table { width: 100%; border-collapse: collapse; margin: 8px 0; }
-.markdown-body thead { background: rgba(255,255,255,0.05); }
-.markdown-body th { padding: 6px 10px; border-bottom: 1px solid #3a3a50; color: #a0a0b0; font-weight: 600; font-size: 12px; }
-.markdown-body td { padding: 6px 10px; border-bottom: 1px solid #2a2a3a; color: #c0c0d0; }
-.markdown-body tr:hover { background: rgba(255,255,255,0.02); }
+/* ============================================================
+   Wreporter — Chainlit Custom CSS
+   Reflex 다크테마 최대한 재현
+   ============================================================ */
+
+/* ── 글로벌 색상 변수 ───────────────────────────────────────── */
+:root {
+  --wr-bg-deepest: #0a0a0f;
+  --wr-bg-sidebar: #0d0d14;
+  --wr-bg-card: #111118;
+  --wr-bg-chat-assistant: #1a1a28;
+  --wr-bg-chat-user: #1a3a5a;
+  --wr-border: #2a2a3a;
+  --wr-border-subtle: rgba(255, 255, 255, 0.06);
+  --wr-text-primary: #e0e0e0;
+  --wr-text-secondary: #a0a0b0;
+  --wr-text-muted: #6a6a80;
+  --wr-text-faint: #4a4a60;
+  --wr-accent: #13deb9;
+  --wr-accent-dim: rgba(0, 200, 180, 0.05);
+  --wr-error: #ff6b6b;
+  --wr-font: 'IBM Plex Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* ── 배경 + 폰트 ──────────────────────────────────────────── */
+body,
+html {
+  background-color: var(--wr-bg-deepest) !important;
+  font-family: var(--wr-font) !important;
+}
+
+/* Chainlit 루트 컨테이너 */
+[data-testid="stAppViewContainer"],
+.MuiBox-root,
+main {
+  background-color: var(--wr-bg-deepest) !important;
+}
+
+/* ── 헤더 ──────────────────────────────────────────────────── */
+header,
+[class*="header"],
+nav {
+  background-color: var(--wr-bg-card) !important;
+  border-bottom: 1px solid var(--wr-border-subtle) !important;
+}
+
+/* 헤더 텍스트 */
+header button,
+header a,
+header span {
+  font-family: var(--wr-font) !important;
+}
+
+/* ── 채팅 영역 ────────────────────────────────────────────── */
+
+/* 메시지 컨테이너 배경 */
+.cl-message-row {
+  font-family: var(--wr-font) !important;
+}
+
+/* 어시스턴트 메시지 스타일 */
+.cl-message-row:not(.cl-message-row-user) .cl-message-content {
+  background-color: var(--wr-bg-chat-assistant) !important;
+  border: 1px solid var(--wr-border) !important;
+  border-radius: 12px 12px 12px 4px !important;
+  padding: 12px 16px !important;
+  color: var(--wr-text-primary) !important;
+  font-size: 14px !important;
+  line-height: 1.7 !important;
+}
+
+/* 사용자 메시지 스타일 */
+.cl-message-row-user .cl-message-content {
+  background-color: var(--wr-bg-chat-user) !important;
+  border: 1px solid rgba(96, 165, 250, 0.2) !important;
+  border-radius: 12px 12px 4px 12px !important;
+  padding: 12px 16px !important;
+  color: #f0f0f0 !important;
+  font-size: 14px !important;
+}
+
+/* ── 입력 영역 ────────────────────────────────────────────── */
+[class*="composer"],
+[class*="input-container"] {
+  border-top: 1px solid var(--wr-border) !important;
+}
+
+textarea,
+[class*="composer"] textarea {
+  font-family: var(--wr-font) !important;
+  font-size: 14px !important;
+  color: var(--wr-text-primary) !important;
+}
+
+/* ── 액션 버튼 ────────────────────────────────────────────── */
+button[id^="action-"] {
+  background-color: rgba(19, 222, 185, 0.1) !important;
+  border: 1px solid rgba(19, 222, 185, 0.3) !important;
+  color: var(--wr-accent) !important;
+  border-radius: 8px !important;
+  padding: 8px 16px !important;
+  font-family: var(--wr-font) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  transition: all 0.2s ease !important;
+}
+
+button[id^="action-"]:hover {
+  background-color: rgba(19, 222, 185, 0.2) !important;
+  border-color: var(--wr-accent) !important;
+}
+
+/* 조사 시작 버튼 특별 강조 */
+button[id^="action-"][class*="start"] {
+  background-color: rgba(19, 222, 185, 0.15) !important;
+  font-weight: 600 !important;
+}
+
+/* ── cl.Step (도구 호출 로그) ──────────────────────────────── */
+[class*="step"],
+.cl-step {
+  border-left: 2px solid var(--wr-accent) !important;
+  background-color: var(--wr-bg-card) !important;
+  border-radius: 4px !important;
+  font-size: 13px !important;
+}
+
+/* ── 사이드 패널 (아티팩트 보고서) ─────────────────────────── */
+[class*="side-view"],
+[class*="element-view"] {
+  background-color: var(--wr-bg-sidebar) !important;
+  border-left: 1px solid var(--wr-border) !important;
+}
+
+/* 사이드 패널 내 텍스트 */
+[class*="side-view"] .markdown-body,
+[class*="element-view"] .markdown-body {
+  color: var(--wr-text-primary) !important;
+  font-size: 13px !important;
+  line-height: 1.7 !important;
+  padding: 16px !important;
+}
+
+/* ── 마크다운 테이블 (B1 해결) ────────────────────────────── */
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 13px;
+}
+
+.markdown-body thead {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.markdown-body th {
+  padding: 8px 12px;
+  border-bottom: 2px solid var(--wr-border);
+  color: var(--wr-text-secondary);
+  font-weight: 600;
+  font-size: 12px;
+  text-align: left;
+}
+
+.markdown-body td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--wr-border);
+  color: var(--wr-text-primary);
+}
+
+.markdown-body tr:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* ── 마크다운 일반 ────────────────────────────────────────── */
+.markdown-body {
+  color: var(--wr-text-primary) !important;
+  font-family: var(--wr-font) !important;
+}
+
+.markdown-body h1 {
+  font-size: 20px !important;
+  font-weight: 700 !important;
+  color: var(--wr-text-primary) !important;
+  border-bottom: 2px solid var(--wr-accent) !important;
+  padding-bottom: 8px !important;
+  margin: 24px 0 16px 0 !important;
+}
+
+.markdown-body h2 {
+  font-size: 17px !important;
+  font-weight: 600 !important;
+  color: var(--wr-accent) !important;
+  border-bottom: 1px solid var(--wr-border) !important;
+  padding-bottom: 6px !important;
+  margin: 20px 0 12px 0 !important;
+}
+
+.markdown-body h3 {
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  color: var(--wr-text-secondary) !important;
+  margin: 16px 0 8px 0 !important;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  padding-left: 24px !important;
+}
+
+.markdown-body li {
+  margin: 4px 0 !important;
+  line-height: 1.6 !important;
+}
+
+.markdown-body code {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  padding: 2px 6px !important;
+  border-radius: 4px !important;
+  font-size: 12px !important;
+  color: var(--wr-accent) !important;
+}
+
+.markdown-body pre {
+  background-color: var(--wr-bg-card) !important;
+  border: 1px solid var(--wr-border) !important;
+  border-radius: 8px !important;
+  padding: 12px !important;
+}
+
+.markdown-body blockquote {
+  border-left: 3px solid var(--wr-accent) !important;
+  background-color: var(--wr-bg-card) !important;
+  padding: 8px 16px !important;
+  margin: 8px 0 !important;
+  color: var(--wr-text-secondary) !important;
+}
+
+.markdown-body strong {
+  color: var(--wr-text-primary) !important;
+  font-weight: 600 !important;
+}
+
+.markdown-body hr {
+  border: none !important;
+  border-top: 1px solid var(--wr-border) !important;
+  margin: 16px 0 !important;
+}
+
+/* ── 스크롤바 ─────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--wr-bg-deepest);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--wr-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--wr-text-faint);
+}
+
+/* ── Chat Profile 선택기 ──────────────────────────────────── */
+[class*="chat-profile"],
+[role="combobox"] {
+  font-family: var(--wr-font) !important;
+}
+
+/* ── 하단 면책조항 숨기기 ─────────────────────────────────── */
+[class*="watermark"],
+footer {
+  display: none !important;
+}
+
+/* ── 보고서 섹션 카드 스타일 (메시지 내 마크다운) ──────────── */
+.markdown-body .section-card {
+  background-color: var(--wr-bg-card);
+  border: 1px solid var(--wr-border);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 8px 0;
+}
+
+/* ── 뱃지 스타일 ──────────────────────────────────────────── */
+.markdown-body .badge-kospi { color: #60a5fa; }
+.markdown-body .badge-kosdaq { color: #34d399; }
+.markdown-body .badge-konex { color: #fbbf24; }
+.markdown-body .badge-unlisted { color: #a855f7; }
+
+/* ── 로딩 인디케이터 ──────────────────────────────────────── */
+[class*="loading"],
+[class*="spinner"] {
+  color: var(--wr-accent) !important;
+}
+
+/* ── 에러 메시지 ──────────────────────────────────────────── */
+.cl-message-content .error {
+  color: var(--wr-error) !important;
+}
+
+/* ── 툴팁/팝업 ────────────────────────────────────────────── */
+[class*="tooltip"],
+[class*="popover"],
+[role="tooltip"] {
+  background-color: var(--wr-bg-card) !important;
+  border: 1px solid var(--wr-border) !important;
+  color: var(--wr-text-primary) !important;
+}
+
+/* ── 사이드바 스레드 목록 ─────────────────────────────────── */
+[class*="thread"],
+[class*="sidebar"] {
+  background-color: var(--wr-bg-sidebar) !important;
+}
+
+/* 사이드바 내 텍스트 */
+[class*="sidebar"] span,
+[class*="sidebar"] p,
+[class*="sidebar"] a {
+  font-family: var(--wr-font) !important;
+  color: var(--wr-text-secondary) !important;
+}
+
+[class*="sidebar"] a:hover {
+  color: var(--wr-text-primary) !important;
+}

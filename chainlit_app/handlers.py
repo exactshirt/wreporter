@@ -116,8 +116,9 @@ async def _handle_standard_research() -> None:
 
     # ── 상태 메시지 전송 ──
     label = _LABEL.get(agent_type, agent_type)
+    corp_name = company.get("corp_name", "")
     status_msg = cl.Message(
-        content=f"🔍 {company.get('corp_name', '')}의 {label}을 시작합니다...",
+        content=f"## 🔍 {corp_name} — {label}\n\n⏳ 분석을 시작합니다...",
     )
     await status_msg.send()
 
@@ -141,7 +142,7 @@ async def _handle_standard_research() -> None:
                         step.output = event.content
                 else:
                     # 도구가 아닌 진행 상황 → 상태 메시지 업데이트
-                    status_msg.content = event.content
+                    status_msg.content = f"## 🔍 {corp_name} — {label}\n\n⏳ {event.content}"
                     await status_msg.update()
 
             elif event.type == "done":
@@ -173,8 +174,9 @@ async def _handle_standard_research() -> None:
                 # ── 아티팩트 사이드바 업데이트 ──
                 await update_artifact_sidebar(jurir_no, agent_type)
 
-                # ── 완료 메시지 ──
-                await cl.Message(content="✅ 보고서 작성 완료").send()
+                # ── 상태 메시지 완료로 업데이트 ──
+                status_msg.content = f"## ✅ {corp_name} — {label} 완료"
+                await status_msg.update()
 
                 # ── C5: 후속 질문 제안 ──
                 await send_suggestions(agent_type, company)
