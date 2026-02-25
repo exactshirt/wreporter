@@ -75,6 +75,7 @@ async def add_pin(company: dict) -> str:
             "has_dart": company.get("has_dart", False),
             "industry": company.get("industry"),
             "ceo_nm": company.get("ceo_nm"),
+            "corp_eng_name": company.get("corp_eng_name"),
         }
         resp = (
             await client.table("pinned_companies")

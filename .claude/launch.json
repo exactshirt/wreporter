@@ -4,11 +4,8 @@
     {
       "name": "wreporter",
       "runtimeExecutable": "C:\\OY\\wreporter\\.venv\\Scripts\\python",
-      "runtimeArgs": ["-m", "reflex", "run"],
-      "port": 3000,
-      "env": {
-        "BACKEND_PORT": "8002"
-      }
+      "runtimeArgs": ["-m", "chainlit", "run", "app.py", "--port", "8001"],
+      "port": 8001
     }
   ]
 }

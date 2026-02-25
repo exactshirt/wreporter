@@ -51,7 +51,8 @@
       "WebFetch(domain:fly.io)",
       "WebFetch(domain:www.freetiers.com)",
       "Bash(wc:*)",
-      "WebFetch(domain:docs.chainlit.io)"
+      "WebFetch(domain:docs.chainlit.io)",
+      "Bash(git apply:*)"
     ]
   }
 }
